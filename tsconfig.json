@@ -1,0 +1,3 @@
+{
+  "extends": "@do-better/config/tsconfig.base.json"
+}
