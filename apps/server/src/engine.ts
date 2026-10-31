@@ -1,4 +1,4 @@
-import type { EngineParams } from "./constants";
+import type { EngineParams, EngineResult } from "./constants";
 import { RequestPattern } from "./constants";
 import {
   createRandomizedRequestRate,
@@ -8,7 +8,7 @@ import {
   prepareEngineParams,
 } from "./utils/helper";
 
-export async function runEngine(params: EngineParams): Promise<void> {
+export async function runEngine(params: EngineParams): Promise<EngineResult> {
   const preparedParams = prepareEngineParams(params);
 
   // running the engine based on the request pattern (handling different type of req patterns)

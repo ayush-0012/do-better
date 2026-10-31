@@ -1,4 +1,4 @@
-import type { EngineParams, RequestRateFunction } from "../constants";
+import type { EngineParams, EngineResult, RequestRateFunction } from "../constants";
 import {
   ENGINE_TICK_MS,
   REQUEST_PATTERN_DEFAULTS,
@@ -81,7 +81,7 @@ export function createRandomizedRequestRate(
 export async function makeApiCalls(
   params: ReturnType<typeof prepareEngineParams>,
   getRequestRate: RequestRateFunction,
-): Promise<void> {
+): Promise<EngineResult> {
   const headers = new Headers(params.requestData?.headers);
   const body = params.requestData?.body;
 
@@ -89,32 +89,57 @@ export async function makeApiCalls(
     headers.set("Content-Type", "application/json");
   }
 
-  // for controlling the api calls
   const controller = new AbortController();
-  const activeRequests = new Set<Promise<void>>(); // putting active requests in a set (set avoids redundancy)
+  const activeRequests = new Set<Promise<void>>();
   const startedAt = performance.now();
+  const startedAtDate = new Date().toISOString();
+  const metrics: EngineResult["metrics"] = {
+    requestsStarted: 0,
+    requestsCompleted: 0,
+    requestsSucceeded: 0,
+    requestsFailed: 0,
+    requestsAborted: 0,
+    requestsSkipped: 0,
+    statusCounts: {},
+    latencyMs: { min: null, max: null, average: null },
+  };
+  let stopReason: EngineResult["stopReason"] = "duration_elapsed";
+  let errorMessage: string | null = null;
+  let latencyTotal = 0;
+  let latencyCount = 0;
   let previousElapsed = 0;
-  let requestBudget = 0; // how many requests will be made
+  let requestBudget = 0;
   let stopped = false;
 
+  const recordLatency = (requestStartedAt: number) => {
+    const elapsed = performance.now() - requestStartedAt;
+    latencyTotal += elapsed;
+    latencyCount++;
+    metrics.latencyMs.min = Math.min(metrics.latencyMs.min ?? elapsed, elapsed);
+    metrics.latencyMs.max = Math.max(metrics.latencyMs.max ?? elapsed, elapsed);
+    metrics.latencyMs.average = latencyTotal / latencyCount;
+  };
+
   try {
-    await new Promise<void>((resolve, reject) => {
-      const stop = (error?: unknown) => {
+    await new Promise<void>((resolve) => {
+      const stop = (reason: EngineResult["stopReason"], error?: unknown) => {
         if (stopped) return;
         stopped = true;
+        stopReason = reason;
+        if (error !== undefined) {
+          errorMessage = (error instanceof Error ? error.message : String(error)).slice(0, 1000);
+        }
         clearInterval(interval);
         clearTimeout(timeout);
         controller.abort();
-
-        if (error === undefined) resolve();
-        else reject(error);
+        resolve();
       };
 
       const interval = setInterval(() => {
         const elapsedSeconds = (performance.now() - startedAt) / 1000;
 
         if (elapsedSeconds >= params.duration) {
-          stop();
+          stop("duration_elapsed");
           return;
         }
 
@@ -125,12 +150,14 @@ export async function makeApiCalls(
 
         const requestsToStart = Math.floor(requestBudget);
         requestBudget -= requestsToStart;
+        const availableSlots = Math.max(0, params.concurrencyLimit - activeRequests.size);
+        const count = Math.min(requestsToStart, availableSlots);
+        metrics.requestsSkipped += requestsToStart - count;
 
-        for (
-          let i = 0;
-          i < requestsToStart && activeRequests.size < params.concurrencyLimit;
-          i++
-        ) {
+        for (let i = 0; i < count && !stopped; i++) {
+          metrics.requestsStarted++;
+          const requestStartedAt = performance.now();
+          let status: number | undefined;
           const request = fetch(params.url, {
             method: "POST",
             headers,
@@ -138,28 +165,50 @@ export async function makeApiCalls(
             signal: controller.signal,
           })
             .then(async (response) => {
+              status = response.status;
+              metrics.statusCounts[status] = (metrics.statusCounts[status] ?? 0) + 1;
               if (response.status === 500) {
-                stop();
-                return;
+                stop("http_500");
               }
 
-              await response.body?.pipeTo(new WritableStream()); // whats the need for this
+              // Drain without retaining the body; a slot stays occupied until the response finishes.
+              await response.body?.pipeTo(new WritableStream());
+              metrics.requestsCompleted++;
+              if (response.ok) metrics.requestsSucceeded++;
+              else metrics.requestsFailed++;
+              recordLatency(requestStartedAt);
             })
             .catch((error: unknown) => {
-              if (!stopped) stop(error);
+              if (status !== 500 && controller.signal.aborted) {
+                metrics.requestsAborted++;
+              } else {
+                metrics.requestsFailed++;
+                recordLatency(requestStartedAt);
+                if (!stopped) stop("request_error", error);
+              }
             })
             .finally(() => {
-              activeRequests.delete(request); // emptying the set at the end
+              activeRequests.delete(request);
             });
 
           activeRequests.add(request);
         }
       }, ENGINE_TICK_MS);
 
-      const timeout = setTimeout(() => stop(), params.duration * 1000);
+      const timeout = setTimeout(() => stop("duration_elapsed"), params.duration * 1000);
     });
   } finally {
     controller.abort();
     await Promise.allSettled(activeRequests);
   }
+
+  return {
+    id: crypto.randomUUID(),
+    startedAt: startedAtDate,
+    finishedAt: new Date().toISOString(),
+    elapsedSeconds: (performance.now() - startedAt) / 1000,
+    stopReason,
+    error: errorMessage,
+    metrics,
+  };
 }

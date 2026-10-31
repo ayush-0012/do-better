@@ -26,7 +26,14 @@ export const ENGINE_TICK_MS = 10; // 10ms for engine req scheduling time
 export type RequestRateFunction = (elapsedSeconds: number) => number;
 
 export const engineParamsSchema = z.object({
-  url: z.string(),
+  url: z.string().refine((value) => {
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }, "Target must be an absolute HTTP(S) URL without embedded credentials"),
   requestData: z
     .object({
       headers: z.record(z.string(), z.string()).optional(),
@@ -55,3 +62,45 @@ export const engineParamsSchema = z.object({
 });
 
 export type EngineParams = z.infer<typeof engineParamsSchema>;
+
+const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const latency = z.number().nonnegative().nullable();
+
+export const engineResultSchema = z.object({
+  id: z.uuid(),
+  startedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime(),
+  elapsedSeconds: z.number().nonnegative(),
+  stopReason: z.enum(["duration_elapsed", "http_500", "request_error"]),
+  error: z.string().max(1000).nullable(),
+  metrics: z.object({
+    requestsStarted: count,
+    requestsCompleted: count,
+    requestsSucceeded: count,
+    requestsFailed: count,
+    requestsAborted: count,
+    requestsSkipped: count,
+    statusCounts: z.record(z.string().regex(/^[1-5]\d{2}$/), count),
+    latencyMs: z.object({ min: latency, max: latency, average: latency }),
+  }),
+}).superRefine((result, context) => {
+  const metrics = result.metrics;
+  if (metrics.requestsStarted !== metrics.requestsSucceeded + metrics.requestsFailed + metrics.requestsAborted) {
+    context.addIssue({ code: "custom", path: ["metrics"], message: "Every started request must have a final outcome" });
+  }
+  if (metrics.requestsCompleted > metrics.requestsStarted) {
+    context.addIssue({ code: "custom", path: ["metrics", "requestsCompleted"], message: "Completed requests cannot exceed started requests" });
+  }
+  if (Date.parse(result.finishedAt) < Date.parse(result.startedAt)) {
+    context.addIssue({ code: "custom", path: ["finishedAt"], message: "A run cannot finish before it starts" });
+  }
+});
+
+export type EngineResult = z.infer<typeof engineResultSchema>;
+
+// Payloads and target authorization headers stay on the user's machine.
+export const testRunUploadSchema = z.object({
+  projectId: z.uuid(),
+  params: engineParamsSchema.omit({ requestData: true }),
+  result: engineResultSchema,
+});
