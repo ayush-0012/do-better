@@ -51,6 +51,10 @@ lerna-debug.log*
 coverage
 .nyc_output
 
+# Local agent guidance
+/agents/
+/AGENTS.md
+
 # Misc
 *.tgz
 .cache
