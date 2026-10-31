@@ -3,7 +3,7 @@ name: do-better
 services:
   postgres:
     image: postgres:18
-    container_name: do-better-postgres
+    container_name: do-better
     environment:
       POSTGRES_DB: do-better
       POSTGRES_USER: postgres
