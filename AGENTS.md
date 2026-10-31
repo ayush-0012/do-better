@@ -12,6 +12,7 @@ Before working, read `agents/rules.md` and `agents/checklist.md` when present. T
 - Approval covers only the agreed scope. An explicit request to implement an agreed plan counts as approval for that plan. Ask again before expanding scope.
 - Obtain specific permission before deleting files, destructive cleanup, overwriting unrelated work, database mutations, deployments, or other consequential actions. Explain the affected resources and expected impact before asking. General implementation approval does not authorize these actions unless explicitly included.
 - Preserve unrelated work. Avoid unsolicited refactors. Ask before adding or changing dependencies or changing public contracts.
+- Do not install packages or dependencies without the user's explicit permission for that installation. This includes package-manager installs, upgrades, and tools downloaded through commands such as `bunx` or `npx`; general implementation approval is not installation permission.
 - Delete temporary folders created by the agent solely for testing when testing finishes, including after failures. This cleanup is a pre-authorized exception to the deletion approval rule only for those folders and their agent-created contents. Preserve permanent tests, existing folders, and user files; ask if ownership is uncertain. Verify cleanup and report any leftovers.
 
 ## Git changes require an explicit request
@@ -24,6 +25,7 @@ Before working, read `agents/rules.md` and `agents/checklist.md` when present. T
 
 ## Engineering and verification
 
+- Keep implementations modular with focused responsibilities and descriptive, domain-relevant names for files, modules, components, functions, and variables. Follow established project conventions and appropriate engineering best practices throughout the project; avoid oversized modules and unnecessary abstractions.
 - Understand the goal and existing implementation. Use clear, focused code and established patterns; choose the simplest solution that meets the requirements.
 - Validate inputs at appropriate boundaries, handle relevant failures with useful context, protect secrets, and consider security, compatibility, and data integrity.
 - Verify meaningful behavior with proportionate checks within the approved scope. Inspect commands and scripts for side effects; ask before checks that require unapproved mutations or consequential actions.

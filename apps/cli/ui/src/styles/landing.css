@@ -1,0 +1,89 @@
+.landing-section { max-width: 1400px; margin: 0 auto; padding: 64px 32px; }
+.hero { padding-top: 86px; padding-bottom: 30px; }
+.hero > .eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 60px; align-items: end; }
+.hero h1 { font-size: clamp(40px, 4.5vw, 66px); font-weight: 800; letter-spacing: -.055em; line-height: 1.08; }
+.hero h1 > span:first-child { color: var(--primary); }
+.hero h1 .heading-mark { width: 10px; height: 10px; margin-left: 10px; }
+.hero-description { font-size: 16px; line-height: 1.75; color: var(--secondary-foreground); max-width: 510px; margin-top: 25px; }
+.hero-actions { padding-bottom: 8px; }
+.hero-actions p { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--success); margin-top: 18px; }
+.hero > .command-bar { margin-top: 36px; }
+.landing-section > .section-heading { padding: 0 0 24px; }
+.landing-section > .section-heading h2 { font-size: 28px; }
+.landing-heading { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; line-height: 1.2; margin-top: 10px; font-weight: 800; }
+.landing-intro { color: var(--secondary-foreground); margin-top: 14px; max-width: 530px; }
+.workflow-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 32px; }
+.workflow-card { padding: 24px; display: flex; flex-direction: column; }
+.workflow-card .section-title { color: var(--primary); margin-bottom: 20px; }
+.workflow-card h3 { font-size: 18px; }
+.workflow-card p { color: var(--secondary-foreground); font-size: 13px; line-height: 1.8; margin: 12px 0 24px; }
+.workflow-card > code { margin-top: auto; padding: 10px 12px; font-size: 10px; background: var(--muted); border-radius: 4px; overflow-wrap: anywhere; }
+.precision-section { background: var(--muted); }
+.precision-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 70px; align-items: center; }
+.principle-list { list-style: none; padding: 0; margin: 28px 0 0; display: flex; flex-direction: column; gap: 20px; }
+.principle-list li { display: flex; gap: 12px; align-items: flex-start; }
+.principle-list svg { width: 18px; color: var(--primary); margin-top: 2px; }
+.principle-list h3 { font-size: 14px; }
+.principle-list p { color: var(--muted-foreground); font-size: 12px; margin-top: 4px; }
+.report-specimen { background: var(--foreground); color: var(--background); padding: 26px; border-radius: 8px; }
+.report-specimen-header { display: flex; justify-content: space-between; gap: 16px; font-size: 10px; margin-bottom: 28px; opacity: .75; }
+.report-specimen > .eyebrow { opacity: .65; }
+.report-specimen-stat { display: flex; align-items: baseline; gap: 16px; margin: 6px 0 24px; }
+.report-specimen-stat strong { font-size: 60px; font-weight: 800; letter-spacing: -.05em; }
+.report-specimen-stat span { font-size: 12px; opacity: .75; }
+.specimen-summary-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; gap: 16px; border-top: 1px solid color-mix(in srgb, var(--background) 20%, transparent); font-size: 12px; }
+.report-specimen .help-text { color: inherit; opacity: .65; margin-top: 20px; }
+.getting-started { text-align: center; max-width: 970px; margin: 0 auto; padding: 54px 60px; border-radius: 9px; background: var(--secondary); }
+.getting-started > .heading-mark { width: 8px; height: 8px; margin: 0 0 18px; }
+.getting-started h2 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.045em; font-weight: 800; }
+.getting-started > p { margin: 20px auto; max-width: 600px; color: var(--secondary-foreground); }
+.getting-started > .command-bar { background: var(--card); margin: 28px auto 0; max-width: 480px; text-align: left; }
+.getting-started > .help-text { max-width: 520px; font-size: 11px; margin-bottom: 0; }
+.specimen { background: var(--muted); padding: 24px; border-radius: 9px; border: 1px solid var(--border); }
+.specimen-title { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.specimen-title h3 { font-size: 28px; font-weight: 800; letter-spacing: -.04em; margin: 6px 0; }
+.specimen-title p:not(.eyebrow) { font-size: 12px; color: var(--secondary-foreground); }
+.specimen-grid { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(240px, 1fr); gap: 20px; }
+.specimen-editor { border-radius: 7px; overflow: hidden; background: var(--card); display: flex; flex-direction: column; min-width: 0; }
+.specimen-editor .request-bar { margin: 12px 12px 0; border-radius: 5px; padding: 10px; }
+.specimen-editor .request-bar code { font-size: 11px; overflow-wrap: anywhere; }
+.specimen-tabs { display: flex; gap: 20px; padding: 15px 18px; font-size: 11px; border-bottom: 1px solid var(--border); }
+.specimen-tabs strong { color: var(--primary); }
+.specimen-tabs > :last-child { margin-left: auto; }
+.specimen-editor pre { font-size: 12px; line-height: 2; margin: 0; padding: 20px; min-height: 240px; overflow-x: auto; }
+.specimen-profile { background: var(--card); border-radius: 7px; padding: 20px; }
+.specimen-profile .pattern-preview { margin-top: 14px; }
+.specimen-profile .pattern-preview svg { height: 40px; }
+.specimen-segments { display: flex; justify-content: space-between; gap: 5px; margin: 12px 0; background: var(--muted); padding: 6px; font-size: 10px; }
+.specimen-segments strong { color: var(--primary); }
+.specimen-profile p { font-size: 11px; margin: 10px 0 5px; }
+.specimen-input { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--muted); border-radius: 4px; }
+.specimen-input strong { font-size: 19px; }
+.specimen-input span { font-size: 9px; color: var(--muted-foreground); }
+.specimen-profile .schedule-summary strong { font-size: 25px; }
+.specimen-action { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 20px; padding: 18px; background: var(--card); border-radius: 6px; }
+.specimen-action .play-tile { width: 40px; height: 40px; }
+.specimen-action h3 { font-size: 15px; }
+.specimen-action p { font-size: 11px; }
+
+@media (max-width: 1050px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .precision-grid { gap: 30px; }
+}
+@media (max-width: 760px) {
+  .landing-section { padding: 42px 18px; }
+  .hero { padding-top: 48px; }
+  .hero > .eyebrow { font-size: 8px; }
+  .hero-description { font-size: 14px; }
+  .workflow-grid, .precision-grid, .specimen-grid { grid-template-columns: minmax(0, 1fr); }
+  .workflow-card { padding: 22px; }
+  .specimen { padding: 14px; }
+  .specimen-title .quiet-tag { display: none; }
+  .specimen-action { flex-direction: column; align-items: flex-start; padding: 14px; }
+  .specimen-editor pre { font-size: 11px; }
+  .specimen-title h3 { font-size: 25px; }
+  .landing-section > .section-heading { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .getting-started { padding: 36px 20px; }
+  .getting-started > p { font-size: 13px; }
+}
