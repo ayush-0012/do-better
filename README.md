@@ -160,25 +160,58 @@ curl -i -b /tmp/do-better-cookies.txt -c /tmp/do-better-cookies.txt \
 curl -i -b /tmp/do-better-cookies.txt http://localhost:3000/api/me
 ```
 
-### Authentication integration tests
+### Automated checks
 
-Use a dedicated PostgreSQL database with this project's schema applied. From the repository root, for example:
+Engine checks run without a database or network access:
 
 ```sh
-docker run --rm -d --name do-better-auth-test \
-  -e POSTGRES_PASSWORD=auth-test-only -e POSTGRES_DB=do_better_auth_test \
-  -p 127.0.0.1:15432:5432 --tmpfs /var/lib/postgresql postgres:18
-
-export TEST_DATABASE_URL='postgresql://postgres:auth-test-only@127.0.0.1:15432/do_better_auth_test'
-
-# Wait for PostgreSQL to be ready before applying the schema.
-docker exec do-better-auth-test pg_isready -U postgres -d do_better_auth_test
-DATABASE_URL="$TEST_DATABASE_URL" bun run --cwd packages/db db:push --force
-bun run --cwd apps/server test:auth
-
-docker stop do-better-auth-test
+bun run --cwd apps/server test:engine
 ```
 
-The suite uses the real database adapter and HTTP endpoints. It supplies test-only credentials, mocks external Google/GitHub responses (including signed Google ID tokens), and makes no live provider calls. It checks cookies, refresh, logout, invalid sessions, OAuth failures, private GitHub emails, and verified account linking. Test-created users, accounts, sessions, and OAuth state are cleaned up afterward. Application environment files and real provider credentials are not needed for this suite.
+Session and result-upload checks use a dedicated database inside the existing `do-better` PostgreSQL container. From the repository root:
+
+```sh
+docker exec do-better createdb -U postgres do_better_test
+export TEST_DATABASE_URL='postgresql://postgres:password@localhost:5432/do_better_test'
+DATABASE_URL="$TEST_DATABASE_URL" bun run --cwd packages/db db:push
+bun run --cwd apps/server test:auth
+bun run --cwd apps/server test:results
+docker exec do-better dropdb -U postgres do_better_test
+```
+
+Use `TEST_DATABASE_URL` only for a dedicated test database, not the `do-better` application database. The integration checks use real HTTP endpoints and PostgreSQL to verify sessions, refresh, logout, project ownership, metrics storage, failed writes, and concurrent upload retries. They clean up their generated records. Real OAuth credentials and application environment files are not needed; Google/GitHub callback flows are not covered by these checks.
 
 Live OAuth smoke tests remain a separate step: configure real credentials, start the backend, complete each provider's browser flow, verify `/api/me`, then log out and verify `401`.
+
+## Local test runs and master storage
+
+`runEngine(params)` executes POST requests to the configured target and returns an `EngineResult`. Target requests are intended to run on the user's machine. The master API only saves and retrieves results; it does not execute requests against the submitted URL. The npm CLI, local HTTP service, and UI are not implemented yet.
+
+Results contain run timestamps, elapsed seconds, a stop reason, and these metrics:
+
+- `requestsStarted`: requests actually dispatched.
+- `requestsCompleted`: responses whose bodies were fully consumed.
+- `requestsSucceeded`: completed responses with a 2xx status.
+- `requestsFailed`: HTTP errors or network/body failures, including the HTTP 500 that stops a run.
+- `requestsAborted`: in-flight requests cancelled when the run stops; these are separate from target failures.
+- `requestsSkipped`: scheduled requests that could not start because the concurrency limit was reached.
+- `statusCounts`: HTTP statuses received, including responses later cancelled while consuming their bodies.
+- `latencyMs`: minimum, maximum, and average duration of successful or failed requests; cancellations are excluded. Timings include consuming the response body.
+
+Response bodies are drained and discarded. They are never included in the engine result or saved to the master database. Target request payloads and authorization headers also stay local. Observed throughput can be calculated as `requestsCompleted / elapsedSeconds`; it describes this run, rather than proving the target's maximum capacity.
+
+The engine retains its existing policy: stop at the configured duration, on HTTP 500, or on a network/body error. Other HTTP error statuses are counted while the run continues. Network failures return partial metrics with `stopReason: "request_error"` and an error message; invalid engine parameters reject before dispatching requests.
+
+The authenticated master endpoints are:
+
+| Endpoint | Behavior |
+| --- | --- |
+| `POST /api/projects` | Create a project belonging to the session's user; returns `{ "project": ... }` |
+| `POST /api/test-runs` | Validate and store `{ "projectId": ..., "params": ..., "result": ... }`; returns `{ "run": ... }` |
+| `GET /api/test-runs/:id` | Read a saved run owned by the session's user |
+
+Use the existing engine parameters as `params`, omitting `requestData`, and the returned `EngineResult` as `result`. The server strips unrecognized fields, checks project ownership, normalizes duration to seconds and rate to requests per second, and stores only the validated result. No `userId` supplied by the client is trusted.
+
+The engine-generated result ID also identifies the database record. A first upload returns `201`; an identical retry returns the existing record with `200`. Reusing an ID for different data returns `409`. If an upload fails, keep the local result and retry uploading it rather than rerunning the target test.
+
+The application schema adds nullable target URL and JSON result columns for compatibility with older records, permits fractional request rates, and leaves the unused legacy `maxRequests` value nullable. `reqHandled` records completed requests. Apply the schema from `packages/db` with `bun run db:push` after configuring the application database connection.
