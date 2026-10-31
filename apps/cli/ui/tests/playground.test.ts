@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { validateDraft } from "../src/features/playground/validate-draft";
+import { getDraftErrors, validateDraft } from "../src/features/playground/validate-draft";
 import { JsonHighlights } from "../src/features/playground/json-highlights";
 import { sampleRuns } from "../src/features/runs/sample-runs";
 import { engineResultSchema } from "../../src/constants";
@@ -13,6 +13,12 @@ const draft: RequestDraft = {
 };
 
 describe("playground configuration boundary", () => {
+  test("reports errors by field and clears them as input is corrected", () => {
+    const invalid = { ...draft, url: "wrong", body: "{", rate: 0 };
+    expect(Object.keys(getDraftErrors(invalid))).toEqual(["url", "body", "rate"]);
+    expect(getDraftErrors({ ...invalid, url: draft.url })).not.toHaveProperty("url");
+    expect(getDraftErrors({ ...invalid, url: draft.url, body: "{}", rate: 20 })).toEqual({});
+  });
   test("accepts JSON primitives, objects, and an omitted body", () => {
     for (const body of ["", " ", "null", "true", "0", '"hello"', "[]", '{"quantity":2}']) {
       expect(validateDraft({ ...draft, body })).toBeNull();

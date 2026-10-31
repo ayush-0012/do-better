@@ -26,7 +26,7 @@ export function AppShell() {
         <Link to="/settings" className="account-link" aria-label="Account settings"><UserRound size={18} /></Link>
       </div>
     </div></header>
-    {showSamples && <div className="sample-notice"><FlaskConical size={14} aria-hidden="true" /><span>Design preview · Sample run data. Authentication, execution, and master uploads are not connected.</span></div>}
+    {showSamples && <div className="sample-notice"><FlaskConical size={14} aria-hidden="true" /><span>Sample data · Execution, authentication, and master uploads are not connected.</span></div>}
     <main id="main-content" tabIndex={-1}><Outlet /></main>
     <footer className="app-footer"><span><strong>do-better</strong> <span className="footer-dot">·</span> Built for local API testing</span><span>Configure. Run. Understand.</span></footer>
   </div>;

@@ -33,8 +33,9 @@ Page components compose these modules. Styles are split by screen/domain under
 
 The UI currently uses explicitly labeled sample reports. Filtering, pagination,
 JSON downloads, theme preferences, configuration validation, header editing, and
-loading run configurations work locally. Run test validates configuration and
-explains that execution is not connected; it never sends target requests.
+loading run configurations work locally. Validate request checks configuration,
+marks individual invalid fields, and clears errors as input is corrected. The
+preview explains that execution is not connected; it never sends target requests.
 Drafts and target secrets stay in memory. Only the theme is stored in localStorage.
 Auth, master uploads, runner status, and serving this build from the CLI are pending.
 

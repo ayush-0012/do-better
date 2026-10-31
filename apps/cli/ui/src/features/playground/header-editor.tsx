@@ -3,12 +3,12 @@ import { Eye, EyeOff, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { HeaderEntry } from "@/features/playground/draft-provider";
 
-export function HeaderEditor({ headers, onChange }: { headers: HeaderEntry[]; onChange: (headers: HeaderEntry[]) => void }) {
+export function HeaderEditor({ headers, onChange, error }: { headers: HeaderEntry[]; onChange: (headers: HeaderEntry[]) => void; error?: string }) {
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   function update(id: string, changes: Partial<HeaderEntry>) {
     onChange(headers.map((header) => header.id === id ? { ...header, ...changes } : header));
   }
-  return <div className="header-editor"><div className="header-editor-labels"><span>Header</span><span>Value</span></div>
+  return <div id="header-editor" className="header-editor" tabIndex={-1} role="group" aria-label="Request headers" aria-invalid={Boolean(error) || undefined} aria-describedby={error ? "headers-error" : undefined}><div className="header-editor-labels"><span>Header</span><span>Value</span></div>
     {headers.length === 0 && <p className="subtle">No custom headers. Add one below.</p>}
     {headers.map((header, index) => {
       const sensitive = /authorization|cookie|token|secret|key/i.test(header.name);

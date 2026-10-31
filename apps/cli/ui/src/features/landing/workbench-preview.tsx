@@ -11,6 +11,6 @@ export function WorkbenchPreview() {
     <div className="specimen-profile"><h3>Load profile</h3><PatternPreview pattern="constant" /><div className="specimen-segments"><strong>Constant</strong><span>Ramp</span><span>Burst</span><span>Random</span></div><p>Request rate</p><div className="specimen-input"><strong>20</strong><span>req / second</span></div>
       <div className="field-pair"><div><p>Duration</p><div className="specimen-input"><strong>30</strong><span>sec</span></div></div><div><p>Concurrency</p><div className="specimen-input"><strong>10</strong></div></div></div>
       <div className="schedule-summary"><strong>600 requests</strong><p>estimated over 30 seconds</p></div></div></div>
-    <div className="specimen-action"><div className="execution-message"><span className="play-tile"><Play size={18} /></span><div><h3>Ready when you are.</h3><p>Requests run from your computer.</p></div></div><Button asChild><Link to="/playground">Explore playground<ArrowRight /></Link></Button></div>
+    <div className="specimen-action"><div className="execution-message"><span className="play-tile"><Play size={18} /></span><div><h3>Ready when you are.</h3><p>Requests run from your computer.</p></div></div><Button asChild><Link to="/playground">Open playground<ArrowRight /></Link></Button></div>
   </div>;
 }

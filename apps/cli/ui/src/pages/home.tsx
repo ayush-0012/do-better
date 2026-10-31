@@ -9,7 +9,7 @@ export function Home() {
     <section className="landing-section hero"><p className="eyebrow"><span className="preview-square" />Precision. From your own machine.</p>
       <div className="hero-grid"><div><h1>Shape the request.<br />Set the load.<br /><span>See what holds.</span><span className="heading-mark" /></h1>
         <p className="hero-description">Put your APIs through their paces. Configure a request, run a load profile locally, and turn the results into something you can act on.</p></div>
-        <div className="hero-actions"><div className="heading-actions"><Button asChild size="lg"><a href="#get-started">Get started<ArrowRight /></a></Button><Button asChild variant="outline" size="lg"><Link to="/playground"><PlayCircle />Explore playground</Link></Button></div><p><ShieldCheck size={14} />Target credentials and payloads stay local.</p></div></div>
+        <div className="hero-actions"><div className="heading-actions"><Button asChild size="lg"><a href="#get-started">Get started<ArrowRight /></a></Button><Button asChild variant="outline" size="lg"><Link to="/playground"><PlayCircle />Open playground</Link></Button></div><p><ShieldCheck size={14} />Target credentials and payloads stay local.</p></div></div>
       <div className="command-bar"><span className="terminal-prompt" aria-hidden="true">$</span><code>do-better start</code><CopyButton value="do-better start" /></div>
     </section>
     <section className="landing-section" aria-labelledby="workbench-title"><div className="section-heading"><div><p className="eyebrow">Interactive specimen</p><h2 id="workbench-title">The local workbench</h2></div><span className="help-text">Designed for a clearer feedback loop.</span></div><WorkbenchPreview /></section>

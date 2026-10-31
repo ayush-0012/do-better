@@ -3,11 +3,11 @@
 .metric-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--secondary-foreground); }
 .metric-value { font-size: clamp(24px, 2.5vw, 36px); font-weight: 800; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .metric-value small { font-size: 12px; font-weight: 500; letter-spacing: 0; }
-.metric-detail { margin-top: 8px; color: var(--muted-foreground); font-size: 11px; }
+.metric-detail { margin-top: 8px; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
 .metric-word { font-size: 27px; }
 .instrument-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 9px; background: var(--muted); border-radius: 8px; margin-bottom: 30px; }
 .instrument-strip > div { display: flex; align-items: center; gap: 12px; background: var(--card); padding: 12px 18px; border-radius: 5px; font-size: 12px; }
-.instrument-strip .eyebrow { margin-bottom: 1px; font-size: 9px; }
+.instrument-strip .eyebrow { margin-bottom: 3px; font-size: 11px; }
 .latest-run { padding: 22px; margin-bottom: 28px; }
 .latest-run-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 14px; background: var(--muted); border-radius: 5px; }
 .target-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
@@ -24,23 +24,23 @@
 .section-heading p { color: var(--muted-foreground); font-size: 12px; margin-top: 4px; }
 .section-heading .eyebrow { color: var(--primary); margin: 0 0 7px; }
 .table-scroll { overflow-x: auto; }
-.run-table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; }
-.run-table th { padding: 15px 18px; white-space: nowrap; background: var(--muted); color: var(--secondary-foreground); font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; font-weight: 500; }
+.run-table { border-collapse: collapse; width: 100%; font-size: 13px; text-align: left; }
+.run-table th { padding: 15px 18px; white-space: nowrap; background: var(--muted); color: var(--secondary-foreground); font-size: 12px; letter-spacing: 0; font-weight: 650; }
 .run-table td { padding: 20px 18px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .run-table tbody tr:last-child td { border-bottom: 0; }
 .run-table tbody tr:hover { background: var(--muted); }
 .run-table td:first-child { min-width: 245px; max-width: 330px; }
 .table-target { display: flex; align-items: center; gap: 7px; }
-.table-target code { overflow-wrap: anywhere; font-size: 10px; }
-.table-secondary { display: block; color: var(--muted-foreground); font-size: 10px; margin-top: 5px; }
-.numeric { font-family: "JetBrains Mono", monospace; font-size: 11px; font-variant-numeric: tabular-nums; }
+.table-target code { overflow-wrap: anywhere; font-size: 12px; }
+.table-secondary { display: block; color: var(--muted-foreground); font-size: 12px; margin-top: 5px; }
+.numeric { font-family: "JetBrains Mono", monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
 .table-actions { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.table-actions > [data-slot="button"] { font-size: 11px; }
-.outcome-label { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; white-space: nowrap; }
+.table-actions > [data-slot="button"] { font-size: 12px; }
+.outcome-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
 .outcome-success { color: var(--success); }
 .outcome-error { color: var(--destructive); }
 .outcome-label .status-dot { width: 5px; height: 5px; }
-.table-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; background: var(--muted); color: var(--secondary-foreground); font-size: 11px; }
+.table-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; background: var(--muted); color: var(--secondary-foreground); font-size: 12px; }
 .history-filters { display: flex; align-items: center; gap: 14px; padding: 16px; margin: 28px 0; }
 .search-field { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--muted); border-radius: 5px; padding: 0 10px; }
 .search-field input { width: 100%; border: 0; background: transparent; font-size: 12px; }
@@ -92,7 +92,7 @@
 @media (max-width: 600px) {
   .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .metric-card { padding: 16px; }
-  .metric-label .eyebrow { font-size: 8px; }
+  .metric-label .eyebrow { font-size: 10px; letter-spacing: .06em; }
   .metric-value { font-size: 28px; }
   .latest-run { padding: 12px; }
   .latest-run-toolbar { padding: 12px; }
