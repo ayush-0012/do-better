@@ -6,7 +6,6 @@
     "build": "tsdown",
     "check-types": "tsc --noEmit",
     "test:auth": "bun test tests/auth.integration.test.ts",
-    "test:engine": "bun test tests/engine.test.ts",
     "test:results": "bun test tests/run-results.integration.test.ts",
     "compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "bun run --hot src/index.ts",

@@ -1,0 +1,18 @@
+{
+  "name": "@do-better/cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "do-better": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node src/index.ts start",
+    "test": "bun test tests",
+    "check-types": "tsc --noEmit",
+    "test:engine": "bun test tests/engine.test.ts"
+  }
+}

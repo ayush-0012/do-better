@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 
-import { RequestRateUnit, testRunUploadSchema } from "../constants";
+import { RequestRateUnit, testRunUploadSchema } from "../../../cli/src/constants";
 import { createRequireAuth } from "../middleware/auth";
 
 export function createTestRunRoutes(auth: Auth, db: Database) {

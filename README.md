@@ -56,6 +56,7 @@ Run standalone Node/Bun tools that use Varlock from the owning app directory so 
 ```
 do-better/
 ├── apps/
+│   ├── cli/         # Local request engine and configuration
 │   └── server/      # Backend API (Express)
 ├── packages/
 │   ├── auth/        # Authentication configuration & logic
@@ -165,7 +166,7 @@ curl -i -b /tmp/do-better-cookies.txt http://localhost:3000/api/me
 Engine checks run without a database or network access:
 
 ```sh
-bun run --cwd apps/server test:engine
+bun run --cwd apps/cli test:engine
 ```
 
 Session and result-upload checks use a dedicated database inside the existing `do-better` PostgreSQL container. From the repository root:
@@ -185,7 +186,37 @@ Live OAuth smoke tests remain a separate step: configure real credentials, start
 
 ## Local test runs and master storage
 
-`runEngine(params)` executes POST requests to the configured target and returns an `EngineResult`. Target requests are intended to run on the user's machine. The master API only saves and retrieves results; it does not execute requests against the submitted URL. The npm CLI, local HTTP service, and UI are not implemented yet.
+### Launching the local UI server
+
+The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves a placeholder UI,
+and opens its URL in the default browser. Stop it with Ctrl+C. The full UI and
+request execution/upload endpoints are still pending.
+
+Until npm installation/publishing is set up, launch from the repository root with:
+
+```sh
+node apps/cli/src/index.ts start
+```
+
+`bun run --cwd apps/cli build` compiles the launch command to
+`apps/cli/dist/index.js` for the package executable. Global installation and npm
+publishing remain deferred.
+
+The CLI requires Node.js 22.18 or newer. It reads optional
+`do-better.config.json` from the directory where the command is run:
+
+```json
+{ "port": 4310 }
+```
+
+With no file or port setting, the default is `4310`. There is no command-line port
+option. Invalid configuration or an occupied port fails with a clear error; the
+CLI does not silently choose another port. If browser opening fails, use the URL
+printed in the terminal.
+
+Run CLI and engine checks with `bun run --cwd apps/cli test`.
+
+`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command and local UI server are implemented; the full UI and local request execution/upload endpoints are pending.
 
 Results contain run timestamps, elapsed seconds, a stop reason, and these metrics:
 

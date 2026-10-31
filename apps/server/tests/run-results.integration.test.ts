@@ -4,7 +4,7 @@ import {
   RequestPattern,
   RequestRateUnit,
   type EngineResult,
-} from "../src/constants";
+} from "../../cli/src/constants";
 import { startTestApi, type TestApi } from "./support/api";
 
 let api: TestApi;
