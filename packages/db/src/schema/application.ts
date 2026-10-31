@@ -1,6 +1,7 @@
 import {
   doublePrecision,
   integer,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -39,11 +40,14 @@ export const testRuns = pgTable(
       .references(() => userProject.id),
     requestPattern: text("request_pattern").notNull(),
     duration: doublePrecision("duration").notNull(),
-    requestRate: integer("request_rate").notNull(),
+    requestRate: doublePrecision("request_rate").notNull(),
     concurrencyLimit: integer("concurrency_limit").notNull(),
-    maxRequests: integer("max_requests").notNull(),
+    // Not supplied by the current engine; keep legacy values without inventing a limit.
+    maxRequests: integer("max_requests"),
     reqHandled: integer("req_handled").default(0).notNull(),
     sustainedAt: text("sustained_at"),
+    url: text("url"),
+    result: jsonb("result"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
