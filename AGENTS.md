@@ -20,6 +20,7 @@ Before working, read `agents/rules.md` and `agents/checklist.md` when present. T
 - Use Git only to inspect existing state, such as `git status`, `git diff`, `git log`, `git show`, and `git check-ignore`.
 - Stage and commit changes only when the user explicitly requests a commit. Push only when the user explicitly requests a push. Authorization applies only to the requested changes and current operation, not future tasks; implementation approval alone never authorizes a commit or push.
 - Do not add Codex/AI co-author or attribution trailers to commit messages.
+- When the user requests commits and pushes, split the work into focused, feature- or module-sized commits (for example backend, CLI, UI, and docs separately) instead of one bulk commit. Keep each commit buildable and exclude unrelated work.
 - Other Git mutations, including fetch, pull, creating or switching branches/worktrees, stash, reset, restore, checkout, clean, merge, rebase, and configuration changes, require separate explicit authorization. Do not bypass these rules through wrappers, tools, or direct edits to Git metadata.
 - The managed Turborepo guidance below does not authorize committing or pushing; otherwise leave changes uncommitted and unpushed.
 
