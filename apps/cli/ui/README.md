@@ -32,18 +32,17 @@ request editing, report components, appearance, and landing previews by domain.
 Page components compose these modules. Styles are split by screen/domain under
 `src/styles`. Fonts are self-hosted under `public/fonts`, with their OFL licenses.
 
-The UI currently uses explicitly labeled sample reports. Filtering, pagination,
-JSON downloads, theme preferences, configuration validation, header editing, and
-loading run configurations work locally. Validate request checks configuration,
-marks individual invalid fields, and clears errors as input is corrected. The
-preview explains that execution is not connected; it never sends target requests.
-Drafts and target secrets stay in memory. Only the theme is stored in localStorage.
-Auth, master uploads, and runner status are pending.
+The Playground executes runs through the local runner and opens each result at
+`/runs/:id`; recent runs stay in the CLI server's memory for this session.
+Filtering, pagination, JSON downloads, theme preferences, configuration validation,
+header editing, and loading run configurations work locally. Drafts and target
+secrets stay in memory. Only the theme is stored in localStorage. History and
+overview still use labeled sample reports; authentication and master uploads are pending.
 
 The exports are design references, not an API specification. Unsupported generated
 claims (Homebrew installation, p95/p99, time-series data, encrypted SQLite export,
 and zero telemetry) are intentionally omitted.
 
-The UI will send API-call configuration to the CLI's local HTTP runner. The runner
-will invoke the existing engine and return its results to the UI. Target requests
-execute locally; authentication and database storage belong to the master server.
+The UI sends API-call configuration to the CLI's local HTTP runner, which invokes
+the existing engine and returns results. Target requests execute locally;
+authentication and database storage belong to the master server.
