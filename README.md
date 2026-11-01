@@ -122,7 +122,7 @@ Initiate either provider through `POST /api/auth/sign-in/social`:
 
 Use `"github"` for GitHub. In a browser, navigate to the returned authorization `url`, preserving the cookies from initiation. Better Auth handles the provider callback, exchanges the authorization code, creates the session, and redirects to `callbackURL`. That final application return URL must be trusted; it is separate from the provider callback registered above. No custom token-exchange endpoint is needed.
 
-Provider callbacks currently terminate at the configured backend. Returning an authenticated session to arbitrary localhost or self-hosted UIs is deferred until the UI/gateway architecture is implemented.
+The local CLI uses this flow without exposing the backend cookie to the browser UI. It requests the provider URL with a relative `callbackURL` of `/api/desktop/handoff?port=<cli-port>&state=<random>`, opens the browser, and waits. After the provider callback creates the backend session, `GET /api/desktop/handoff` mints a single-use Better Auth token (two-minute lifetime) and redirects to `http://127.0.0.1:<port>/api/account/oauth/complete` with the token and the original state. The CLI validates the state (ten-minute lifetime, single use) and exchanges the token for its own session cookie. Tokens and state must never be logged or shared.
 
 ### Sessions and account linking
 
@@ -190,7 +190,6 @@ Live OAuth smoke tests remain a separate step: configure real credentials, start
 
 The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves the built React UI
 from `apps/cli/ui/dist`, and opens its URL in the default browser. Stop it with Ctrl+C.
-Connecting the master upload endpoints is still pending.
 
 Build the UI and the launch command from the repository root before the first start:
 
@@ -213,27 +212,65 @@ The CLI requires Node.js 22.18 or newer. It reads optional
 `do-better.config.json` from the directory where the command is run:
 
 ```json
-{ "port": 4310 }
+{ "port": 4310, "apiUrl": "http://localhost:3000" }
 ```
 
-With no file or port setting, the default is `4310`. There is no command-line port
-option. Invalid configuration or an occupied port fails with a clear error; the
-CLI does not silently choose another port. If browser opening fails, use the URL
-printed in the terminal.
+With no file or settings, the defaults are `4310` and `http://localhost:3000`.
+`apiUrl` must be the master server origin without a path, query, or credentials;
+plain HTTP is accepted only for loopback hosts, and other hosts require HTTPS.
+There is no command-line port option. Invalid configuration or an occupied port
+fails with a clear error; the CLI does not silently choose another port. If
+browser opening fails, use the URL printed in the terminal.
 
 While the CLI is running, the UI uses `GET /api/runner`, `POST /api/runs`, and
 `GET /api/runs/:id` to run tests and open their reports. Recent runs are kept in
-memory and are lost when the server restarts.
+memory and are lost when the server restarts; completed runs saved to the master
+survive locally through the retry queue described below.
+
+### Signing in and saving runs
+
+Sign in from Settings with email and password, Google, or GitHub. The CLI stores
+the Better Auth session cookie at `~/.do-better/session.json` (owner-only, mode
+`0600`) and never sends it to the browser UI. On startup it validates the saved
+session with `GET /api/auth/get-session`; an invalid session is discarded, while
+an unreachable master shows an offline state with a retry action. OAuth uses the
+desktop handoff described under [OAuth application registration](#oauth-application-registration).
+
+When a run finishes while signed in, the CLI uploads it automatically. The
+server assigns the project ID when the CLI calls `POST /api/projects`; the CLI
+stores it in `~/.do-better/project.json` and reuses it for later runs. Uploads go
+through `POST /api/test-runs` with the engine parameters (without `requestData`)
+and the result.
+
+Failed uploads are kept in `~/.do-better/pending-uploads.json` (owner-only, at
+most 200 records) as `{ userId, projectId, params, result }`. The file contains
+the target URL and aggregate metrics, never headers or request bodies. Retry
+from the results page, from Settings, or automatically on the next sign-in and
+startup. Retrying only repeats the upload; the target is never rerun. Runs
+completed while signed out are labeled `not_signed_in` and are not queued; after
+signing in, their results page offers a one-time save action.
+
+Local account and upload endpoints:
+
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /api/account` | Current account state, user, backend origin, and project ID |
+| `POST /api/account/sign-in` | Email/password sign-in, then retry pending uploads |
+| `POST /api/account/sign-out` | Sign out locally and clear the saved session |
+| `POST /api/account/oauth/start` | Build a provider URL and open the browser |
+| `GET /api/account/oauth/complete` | Validate state, exchange the one-time token |
+| `GET /api/uploads` | Count of runs waiting to upload |
+| `POST /api/uploads/retry` | Retry the signed-in user's pending uploads |
 
 Run CLI and engine checks with `bun run --cwd apps/cli test`.
 
 Run `bun run --cwd apps/cli/ui dev` to preview the Stitch-based landing page,
 overview, playground, history, results, and settings. The UI supports light/dark
 themes, executes runs through the local runner, and uses sample history until
-master-backed reports are connected.
-See [the UI README](apps/cli/ui/README.md) for verification and module details.
+more saved runs are available in the UI. See [the UI README](apps/cli/ui/README.md)
+for verification and module details.
 
-`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command, local UI server, and local execution API are implemented; connecting the master upload endpoints is pending.
+`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command, local UI server, local execution API, account sign-in, and master uploads are implemented.
 
 Results contain run timestamps, elapsed seconds, a stop reason, and these metrics:
 
@@ -257,6 +294,7 @@ The authenticated master endpoints are:
 | `POST /api/projects` | Create a project belonging to the session's user; returns `{ "project": ... }` |
 | `POST /api/test-runs` | Validate and store `{ "projectId": ..., "params": ..., "result": ... }`; returns `{ "run": ... }` |
 | `GET /api/test-runs/:id` | Read a saved run owned by the session's user |
+| `GET /api/desktop/handoff` | Redirect a completed OAuth session to the local CLI with a single-use token |
 
 Use the existing engine parameters as `params`, omitting `requestData`, and the returned `EngineResult` as `result`. The server strips unrecognized fields, checks project ownership, normalizes duration to seconds and rate to requests per second, and stores only the validated result. No `userId` supplied by the client is trusted.
 

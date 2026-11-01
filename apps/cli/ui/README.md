@@ -36,13 +36,18 @@ The Playground executes runs through the local runner and opens each result at
 `/runs/:id`; recent runs stay in the CLI server's memory for this session.
 Filtering, pagination, JSON downloads, theme preferences, configuration validation,
 header editing, and loading run configurations work locally. Drafts and target
-secrets stay in memory. Only the theme is stored in localStorage. History and
-overview still use labeled sample reports; authentication and master uploads are pending.
+secrets stay in memory. Only the theme is stored in localStorage. Settings signs
+in with email/password, Google, or GitHub; the header shows the account state and
+completed runs save to the master automatically. Results show whether a run was
+saved and offer a retry; Settings lists pending uploads. History and overview
+still use labeled sample reports.
 
 The exports are design references, not an API specification. Unsupported generated
 claims (Homebrew installation, p95/p99, time-series data, encrypted SQLite export,
 and zero telemetry) are intentionally omitted.
 
 The UI sends API-call configuration to the CLI's local HTTP runner, which invokes
-the existing engine and returns results. Target requests execute locally;
-authentication and database storage belong to the master server.
+the existing engine and returns results. Target requests execute locally. The CLI
+holds the master session and uploads completed runs; the browser never receives
+the session cookie. Authentication and database storage belong to the master
+server.
