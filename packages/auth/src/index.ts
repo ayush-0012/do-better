@@ -2,6 +2,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@do-better/db";
 import * as schema from "@do-better/db/schema/auth";
 import { betterAuth } from "better-auth";
+import { oneTimeToken } from "better-auth/plugins";
 
 export type AuthConfig = {
   BETTER_AUTH_URL: string;
@@ -53,7 +54,7 @@ export function createAuth(
       // Better Auth otherwise skips origin validation in test environments.
       disableOriginCheck: false,
     },
-    plugins: [],
+    plugins: [oneTimeToken({ expiresIn: 2 })],
   });
 }
 
