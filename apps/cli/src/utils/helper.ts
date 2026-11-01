@@ -1,10 +1,10 @@
-import type { EngineParams, EngineResult, RequestRateFunction } from "../constants";
+import type { EngineParams, EngineResult, RequestRateFunction } from "../constants.ts";
 import {
   ENGINE_TICK_MS,
   REQUEST_PATTERN_DEFAULTS,
   RequestRateUnit,
   engineParamsSchema,
-} from "../constants";
+} from "../constants.ts";
 
 // preparing the params for passing in the api calls
 export function prepareEngineParams(input: EngineParams) {

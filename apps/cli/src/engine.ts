@@ -1,12 +1,12 @@
-import type { EngineParams, EngineResult } from "./constants";
-import { RequestPattern } from "./constants";
+import type { EngineParams, EngineResult } from "./constants.ts";
+import { RequestPattern } from "./constants.ts";
 import {
   createRandomizedRequestRate,
   getBurstRequestRate,
   getRampRequestRate,
   makeApiCalls,
   prepareEngineParams,
-} from "./utils/helper";
+} from "./utils/helper.ts";
 
 export async function runEngine(params: EngineParams): Promise<EngineResult> {
   const preparedParams = prepareEngineParams(params);
