@@ -96,8 +96,8 @@ export function PlaygroundPage() {
     setRunError("");
     setRunStartedAt(new Date().toISOString());
     startRun.mutate(params, {
-      onSuccess: (run) => {
-        void navigate({ to: "/runs/$runId", params: { runId: run.result.id } });
+      onSuccess: (payload) => {
+        void navigate({ to: "/runs/$runId", params: { runId: payload.run.result.id } });
       },
       onError: (error) => {
         setRunStartedAt(null);

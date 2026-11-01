@@ -24,6 +24,22 @@
 .theme-dark span:first-child { background: #ff735c; }
 .privacy-list { display: flex; flex-direction: column; gap: 18px; margin: 18px 0 0; padding-left: 18px; color: var(--secondary-foreground); font-size: 13px; }
 .privacy-list strong { color: var(--foreground); }
+.account-status { margin-top: 16px; font-size: 13px; color: var(--secondary-foreground); }
+.account-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 20px; }
+.account-identity strong { display: block; font-size: 16px; }
+.account-identity span { color: var(--secondary-foreground); font-size: 13px; }
+.account-details { margin-top: 18px; }
+.account-form { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; max-width: 420px; margin-top: 20px; }
+.account-form .field { width: 100%; }
+.account-form .field > input { width: 100%; font-size: 14px; font-weight: 400; background: var(--card); }
+.account-divider { display: flex; align-items: center; gap: 10px; max-width: 420px; margin-top: 20px; color: var(--muted-foreground); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.account-divider::before, .account-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.account-oauth { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.account-pending { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.account-pending h3 { font-size: 14px; }
+.account-pending p { margin-top: 4px; color: var(--secondary-foreground); font-size: 12px; }
+.account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 22px; }
+.account-note { margin-top: 14px; }
 
 @media (max-width: 760px) {
   .settings-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }

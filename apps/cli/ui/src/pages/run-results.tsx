@@ -9,18 +9,22 @@ import { RunSummary } from "@/features/runs/run-summary";
 import { StatusDistribution } from "@/features/runs/status-distribution";
 import { PatternPreview } from "@/features/playground/pattern-preview";
 import { useRequestDraft } from "@/features/playground/draft-provider";
+import { useRetryRunUpload, useAccount } from "@/features/account/use-account";
 import { sampleRuns } from "@/features/runs/sample-runs";
 import { formatLatency, patternLabels, stopReasonLabels } from "@/lib/run-types";
-import { getRun, runQueryKey } from "@/lib/local-api";
+import { getRun, runQueryKey, type RunUploadState } from "@/lib/local-api";
 import { downloadJson } from "@/lib/download-json";
 
 export function RunResultsPage({ runId }: { runId: string }) {
   const localRun = useQuery({ queryKey: runQueryKey(runId), queryFn: () => getRun(runId), retry: false });
+  const retryUpload = useRetryRunUpload(runId);
+  const account = useAccount();
   const { loadConfiguration } = useRequestDraft();
   const navigate = useNavigate();
   const sampleRun = sampleRuns.find((entry) => entry.result.id === runId);
-  const run = localRun.data ?? sampleRun;
-  const isLocalRun = localRun.data != null;
+  const run = localRun.data?.run ?? sampleRun;
+  const upload = localRun.data?.upload;
+  const isLocalRun = localRun.data?.run != null;
 
   if (!run && localRun.isPending) {
     return <div className="page-container"><section className="panel" role="status"><p>Loading this run from the local runner…</p></section></div>;
@@ -44,7 +48,16 @@ export function RunResultsPage({ runId }: { runId: string }) {
       <Button variant="outline" onClick={() => downloadJson(run, `do-better-${isLocalRun ? "local" : "sample"}-${result.id}.json`)}><Download />Export JSON</Button>
       <Button onClick={loadInPlayground}>Run again in Playground<ArrowRight /></Button></>} />
     <div className="panel run-context"><div><div className="target-line"><span className="method-badge">POST</span><code>{configuration.url}</code></div><p className={result.stopReason === "duration_elapsed" ? "text-success" : "text-danger"}>{stopReasonLabels[result.stopReason]} · {result.elapsedSeconds}s elapsed</p></div>
-      <div className="quiet-tag">{isLocalRun ? "Local run · Not uploaded" : "Sample report · Not uploaded"}</div></div>
+      <div className="run-context-actions">
+        <span className={`quiet-tag ${isLocalRun && upload?.state === "uploaded" ? "text-success" : ""}`}>{isLocalRun ? uploadLabel(upload) : "Sample report"}</span>
+        {isLocalRun && upload?.state === "pending" && <Button size="sm" variant="outline" onClick={() => retryUpload.mutate()} disabled={retryUpload.isPending}>{retryUpload.isPending ? "Saving…" : "Retry save"}</Button>}
+        {isLocalRun && upload?.state === "not_signed_in" && (account.data?.state === "signed_in"
+          ? <Button size="sm" variant="outline" onClick={() => retryUpload.mutate()} disabled={retryUpload.isPending}>{retryUpload.isPending ? "Saving…" : "Save now"}</Button>
+          : <Button size="sm" variant="outline" asChild><Link to="/settings" hash="account">Sign in to save</Link></Button>)}
+      </div></div>
+    {isLocalRun && upload?.state === "pending" && <div className="notice notice-error" role="status"><strong>Not saved yet.</strong> {upload.error}</div>}
+    {isLocalRun && upload?.state === "not_signed_in" && <div className="notice" role="note"><strong>Local only.</strong> {account.data?.state === "signed_in" ? "Save this run's metrics to the master server." : "Sign in from Settings to save this run's metrics to the master server."}</div>}
+    {retryUpload.error && <div className="notice notice-error" role="alert">{retryUpload.error instanceof Error ? retryUpload.error.message : "The run could not be saved."}</div>}
     {result.error && <div role="note" className="notice notice-error">{result.error}. Partial metrics are preserved in this {isLocalRun ? "run" : "sample"}.</div>}
     <div className="report-grid"><div className="report-main"><RunSummary run={run} />
       <section className="panel report-section"><div className="section-title"><h2><Timer size={22} className="accent-icon" />Measured latency bounds</h2></div>
@@ -62,4 +75,21 @@ export function RunResultsPage({ runId }: { runId: string }) {
     </aside></div>
     <div className="execution-tray"><div className="execution-message"><SlidersHorizontal className="accent-icon" /><p>Try another rate or concurrency limit.</p></div><Button variant="outline" onClick={loadInPlayground}>Open in editor<ArrowRight /></Button></div>
   </div>;
+}
+
+function uploadLabel(upload: RunUploadState | undefined) {
+  switch (upload?.state) {
+    case "uploaded":
+      return `Saved to master · ${shortId(upload.projectId)}`;
+    case "pending":
+      return "Save pending";
+    case "not_signed_in":
+      return "Not saved · signed out";
+    default:
+      return "Not saved";
+  }
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? value.slice(0, 8) : value;
 }

@@ -15,6 +15,42 @@ export interface LocalApiIssue {
   message: string;
 }
 
+export interface AccountUser {
+  id: string;
+  name?: string;
+  email?: string;
+}
+
+export interface AccountSnapshot {
+  state: "checking" | "signed_out" | "signed_in" | "unavailable";
+  backendUrl: string;
+  user?: AccountUser;
+  error?: string;
+  projectId: string | null;
+}
+
+export type RunUploadState =
+  | { state: "uploaded"; projectId: string }
+  | { state: "pending"; error: string; projectId: string | null }
+  | { state: "not_signed_in" }
+  | { state: "not_uploaded" };
+
+export interface LocalRunPayload {
+  run: RunRecord;
+  upload: RunUploadState;
+}
+
+export interface PendingUploadSummary {
+  count: number;
+  error?: string;
+}
+
+export interface RetrySummary {
+  uploaded: number;
+  remaining: number;
+  error?: string;
+}
+
 export class LocalApiError extends Error {
   constructor(
     message: string,
@@ -28,27 +64,74 @@ export class LocalApiError extends Error {
 
 export const runnerQueryKey = ["runner"] as const;
 export const runQueryKey = (runId: string) => ["run", runId] as const;
+export const accountQueryKey = ["account"] as const;
+export const pendingUploadsQueryKey = ["pending-uploads"] as const;
 
 export async function getRunnerStatus(): Promise<RunnerStatus> {
-  const response = await request("/api/runner");
-  return readJson<RunnerStatus>(response);
+  return readJson<RunnerStatus>(await request("/api/runner"));
 }
 
-export async function startRun(params: EngineParams): Promise<RunRecord> {
-  const response = await request("/api/runs", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  const payload = await readJson<{ run: RunRecord }>(response);
-  return payload.run;
+export async function startRun(params: EngineParams): Promise<LocalRunPayload> {
+  const payload = await readJson<LocalRunPayload>(
+    await request("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    }),
+  );
+  return payload;
 }
 
-export async function getRun(runId: string): Promise<RunRecord | null> {
+export async function getRun(runId: string): Promise<LocalRunPayload | null> {
   const response = await request(`/api/runs/${encodeURIComponent(runId)}`);
   if (response.status === 404) return null;
-  const payload = await readJson<{ run: RunRecord }>(response);
-  return payload.run;
+  return readJson<LocalRunPayload>(response);
+}
+
+export async function retryRunUpload(runId: string): Promise<RunUploadState> {
+  const payload = await readJson<{ upload: RunUploadState }>(
+    await request(`/api/runs/${encodeURIComponent(runId)}/upload`, { method: "POST" }),
+  );
+  return payload.upload;
+}
+
+export async function getAccount(): Promise<AccountSnapshot> {
+  return readJson<AccountSnapshot>(await request("/api/account"));
+}
+
+export async function signIn(email: string, password: string) {
+  const payload = await readJson<{ account: AccountSnapshot; retry: RetrySummary }>(
+    await request("/api/account/sign-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }),
+  );
+  return payload;
+}
+
+export async function signOut() {
+  return readJson<{ account: AccountSnapshot; warning?: string }>(
+    await request("/api/account/sign-out", { method: "POST" }),
+  );
+}
+
+export async function startOAuth(provider: "google" | "github") {
+  return readJson<{ started: boolean; provider: string }>(
+    await request("/api/account/oauth/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider }),
+    }),
+  );
+}
+
+export async function getPendingUploads(): Promise<PendingUploadSummary> {
+  return readJson<PendingUploadSummary>(await request("/api/uploads"));
+}
+
+export async function retryPendingUploads(): Promise<RetrySummary> {
+  return readJson<RetrySummary>(await request("/api/uploads/retry", { method: "POST" }));
 }
 
 async function request(path: string, init?: RequestInit) {
