@@ -1,6 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
+import { handleLocalApi } from "./api.ts";
 import { contentTypeFor, DEFAULT_UI_DIRECTORY, resolveUiRequest } from "./ui-assets.ts";
 
 const HOST = "127.0.0.1";
@@ -80,21 +81,23 @@ async function serveRequest(
 
   setSecurityHeaders(res);
 
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", `http://${HOST}`);
+  } catch {
+    sendText(res, 400, "Bad request");
+    return;
+  }
+
+  if (await handleLocalApi(req, res, url, `http://${expectedHost}`)) return;
+
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET, HEAD");
     sendText(res, 405, "Method not allowed");
     return;
   }
 
-  let pathname: string;
-  try {
-    pathname = new URL(req.url ?? "/", `http://${HOST}`).pathname;
-  } catch {
-    sendText(res, 400, "Bad request");
-    return;
-  }
-
-  const request = resolveUiRequest(uiDirectory, pathname);
+  const request = resolveUiRequest(uiDirectory, url.pathname);
   if (request.kind === "not-found") {
     sendText(res, 404, "Not found");
     return;
