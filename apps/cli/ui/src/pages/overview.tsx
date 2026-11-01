@@ -7,6 +7,7 @@ import { RunSummary } from "@/features/runs/run-summary";
 import { RunTable } from "@/features/runs/run-table";
 import { PatternPreview } from "@/features/playground/pattern-preview";
 import { useRequestDraft } from "@/features/playground/draft-provider";
+import { useRunnerStatus } from "@/features/playground/use-runner";
 import { sampleRuns } from "@/features/runs/sample-runs";
 import { downloadJson } from "@/lib/download-json";
 import { formatNumber } from "@/lib/run-types";
@@ -15,12 +16,16 @@ export function OverviewPage() {
   const latest = sampleRuns[0]!;
   const { loadConfiguration } = useRequestDraft();
   const navigate = useNavigate();
+  const runner = useRunnerStatus();
+  const runnerState = runner.data?.state;
+  const runnerLabel = runnerState === "running" ? "Run in progress" : runnerState === "idle" ? "Ready for a run" : "Status unavailable";
+  const runnerDot = runnerState === "running" ? "status-running" : runnerState === "idle" ? "status-idle" : "status-unavailable";
   const endpointCount = new Set(sampleRuns.map((run) => run.configuration.url)).size;
   const totals = sampleRuns.reduce((sum, run) => ({ started: sum.started + run.result.metrics.requestsStarted, succeeded: sum.succeeded + run.result.metrics.requestsSucceeded }), { started: 0, succeeded: 0 });
   return <div className="page-container"><PageHeading eyebrow="Benchmarking workspace" title="Overview" description="Your local workbench. A clear view of every test." actions={<>
     <Button variant="outline" onClick={() => downloadJson(sampleRuns, "do-better-sample-runs.json")}><Download />Export sample runs</Button>
     <Button asChild><Link to="/playground"><Plus />New run</Link></Button></>} />
-    <div className="instrument-strip"><div><span className="status-dot status-idle" /><div><p className="eyebrow">Runner</p><span>Not linked in preview</span></div></div>
+    <div className="instrument-strip"><div><span className={`status-dot ${runnerDot}`} /><div><p className="eyebrow">Runner</p><span>{runnerLabel}</span></div></div>
       <div><ShieldCheck size={18} /><div><p className="eyebrow">Execution</p><span>Target requests stay local</span></div></div>
       <div><span className="preview-square" /><div><p className="eyebrow">Data source</p><span>Six illustrative sample runs</span></div></div></div>
     <section className="panel latest-run"><div className="latest-run-toolbar"><div className="target-line"><span className="method-badge">POST</span><code>{latest.configuration.url}</code><span className="quiet-tag">Latest sample</span></div>
