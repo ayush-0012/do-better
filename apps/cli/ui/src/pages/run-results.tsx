@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Download, LockKeyhole, SlidersHorizontal, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,22 +11,41 @@ import { PatternPreview } from "@/features/playground/pattern-preview";
 import { useRequestDraft } from "@/features/playground/draft-provider";
 import { sampleRuns } from "@/features/runs/sample-runs";
 import { formatLatency, patternLabels, stopReasonLabels } from "@/lib/run-types";
+import { getRun, runQueryKey } from "@/lib/local-api";
 import { downloadJson } from "@/lib/download-json";
 
 export function RunResultsPage({ runId }: { runId: string }) {
-  const run = sampleRuns.find((entry) => entry.result.id === runId);
+  const localRun = useQuery({ queryKey: runQueryKey(runId), queryFn: () => getRun(runId), retry: false });
   const { loadConfiguration } = useRequestDraft();
   const navigate = useNavigate();
-  if (!run) return <div className="page-container"><EmptyState title="Run not found" description="This preview contains only the sample runs listed in history." action={<Button asChild><Link to="/history">Back to history</Link></Button>} /></div>;
+  const sampleRun = sampleRuns.find((entry) => entry.result.id === runId);
+  const run = localRun.data ?? sampleRun;
+  const isLocalRun = localRun.data != null;
+
+  if (!run && localRun.isPending) {
+    return <div className="page-container"><section className="panel" role="status"><p>Loading this run from the local runner…</p></section></div>;
+  }
+  if (!run && localRun.isError) {
+    return <div className="page-container"><EmptyState title="Local runner unavailable"
+      description={localRun.error instanceof Error ? localRun.error.message : "The local runner could not load this run."}
+      action={<Button onClick={() => void localRun.refetch()}>Try again</Button>} /></div>;
+  }
+  if (!run) {
+    return <div className="page-container"><EmptyState title="Run not found"
+      description="Runs are kept in memory for this session and disappear when the CLI server restarts."
+      action={<Button asChild><Link to="/history">Back to history</Link></Button>} /></div>;
+  }
+
   const { result, configuration } = run;
   const loadInPlayground = () => { loadConfiguration(configuration); void navigate({ to: "/playground" }); };
   return <div className="page-container"><Link to="/history" className="back-link"><ArrowLeft size={18} />Back to history</Link>
-    <PageHeading eyebrow="Execution report" title={`Run results: ${new URL(configuration.url).pathname}`} description="A clear view of what this sample execution returned." actions={<>
-      <Button variant="outline" onClick={() => downloadJson(run, `do-better-sample-${result.id}.json`)}><Download />Export JSON</Button>
+    <PageHeading eyebrow="Execution report" title={`Run results: ${new URL(configuration.url).pathname}`}
+      description={isLocalRun ? "A clear view of what this local run returned." : "A clear view of what this sample execution returned."} actions={<>
+      <Button variant="outline" onClick={() => downloadJson(run, `do-better-${isLocalRun ? "local" : "sample"}-${result.id}.json`)}><Download />Export JSON</Button>
       <Button onClick={loadInPlayground}>Run again in Playground<ArrowRight /></Button></>} />
     <div className="panel run-context"><div><div className="target-line"><span className="method-badge">POST</span><code>{configuration.url}</code></div><p className={result.stopReason === "duration_elapsed" ? "text-success" : "text-danger"}>{stopReasonLabels[result.stopReason]} · {result.elapsedSeconds}s elapsed</p></div>
-      <div className="quiet-tag">Sample report · Not uploaded</div></div>
-    {result.error && <div role="note" className="notice notice-error">{result.error}. Partial metrics are preserved in this sample.</div>}
+      <div className="quiet-tag">{isLocalRun ? "Local run · Not uploaded" : "Sample report · Not uploaded"}</div></div>
+    {result.error && <div role="note" className="notice notice-error">{result.error}. Partial metrics are preserved in this {isLocalRun ? "run" : "sample"}.</div>}
     <div className="report-grid"><div className="report-main"><RunSummary run={run} />
       <section className="panel report-section"><div className="section-title"><h2><Timer size={22} className="accent-icon" />Measured latency bounds</h2></div>
         <div className="latency-grid"><MetricCard label="Minimum" value={formatLatency(result.metrics.latencyMs.min)} /><MetricCard label="Average" value={formatLatency(result.metrics.latencyMs.average)} /><MetricCard label="Maximum" value={formatLatency(result.metrics.latencyMs.max)} /></div>

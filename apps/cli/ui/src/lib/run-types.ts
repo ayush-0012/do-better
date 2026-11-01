@@ -1,5 +1,7 @@
 import type { EngineParams, EngineResult } from "../../../src/constants";
 
+export type { EngineParams } from "../../../src/constants";
+
 export type RequestPattern = `${EngineParams["requestPattern"]}`;
 export type RateUnit = `${EngineParams["requestRateUnit"]}`;
 
