@@ -1,8 +1,12 @@
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
+import { AccountService } from "./account.ts";
 import { handleLocalApi } from "./api.ts";
+import { openBrowser } from "./browser.ts";
+import { DEFAULT_API_URL } from "./config.ts";
 import { contentTypeFor, DEFAULT_UI_DIRECTORY, resolveUiRequest } from "./ui-assets.ts";
+import { UploadService } from "./uploads.ts";
 
 const HOST = "127.0.0.1";
 
@@ -24,14 +28,28 @@ const CONTENT_SECURITY_POLICY = [
 export interface LocalServerOptions {
   /** Overrides the UI build directory; tests use a fixture. */
   uiDirectory?: string;
+  /** Master API origin used for sign-in and run uploads. */
+  apiUrl?: string;
+  /** Overrides ~/.do-better for tests or custom installs. */
+  stateDirectory?: string;
+  launchBrowser?: (url: string) => Promise<void>;
+  /** Tests can skip waiting for the saved session check. */
+  awaitSessionCheck?: boolean;
 }
 
 export async function startLocalServer(port: number, options: LocalServerOptions = {}): Promise<Server> {
   const uiDirectory = resolve(options.uiDirectory ?? DEFAULT_UI_DIRECTORY);
   await assertUiBuild(uiDirectory);
 
+  const account = new AccountService({
+    backendUrl: options.apiUrl ?? DEFAULT_API_URL,
+    stateDirectory: options.stateDirectory,
+    launchBrowser: options.launchBrowser ?? openBrowser,
+  });
+  const uploads = new UploadService({ account, stateDirectory: options.stateDirectory });
+
   const server = createServer((req, res) => {
-    serveRequest(req, res, server, uiDirectory).catch((error: unknown) => {
+    serveRequest(req, res, server, uiDirectory, account, uploads).catch((error: unknown) => {
       console.error(
         `do-better: local UI request failed: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -49,6 +67,17 @@ export async function startLocalServer(port: number, options: LocalServerOptions
       resolveListen();
     });
   });
+
+  const address = server.address();
+  if (typeof address === "object" && address) account.setLocalPort(address.port);
+  if (options.awaitSessionCheck !== false) {
+    await Promise.all([account.initialize(), uploads.initialize()]);
+    if (account.getStatus().state === "signed_in") void uploads.retryPending();
+  } else {
+    void Promise.all([account.initialize(), uploads.initialize()]).then(() => {
+      if (account.getStatus().state === "signed_in") void uploads.retryPending();
+    });
+  }
   return server;
 }
 
@@ -70,6 +99,8 @@ async function serveRequest(
   res: ServerResponse,
   server: Server,
   uiDirectory: string,
+  account: AccountService,
+  uploads: UploadService,
 ) {
   // Keep the local service inaccessible through attacker-controlled DNS names.
   const address = server.address();
@@ -89,7 +120,7 @@ async function serveRequest(
     return;
   }
 
-  if (await handleLocalApi(req, res, url, `http://${expectedHost}`)) return;
+  if (await handleLocalApi(req, res, url, `http://${expectedHost}`, { account, uploads })) return;
 
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET, HEAD");
