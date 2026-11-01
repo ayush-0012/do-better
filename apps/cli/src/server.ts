@@ -1,41 +1,135 @@
-import { createServer } from "node:http";
+import { readFile, stat } from "node:fs/promises";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { join, resolve } from "node:path";
+import { contentTypeFor, DEFAULT_UI_DIRECTORY, resolveUiRequest } from "./ui-assets.ts";
 
-const page = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>do-better</title></head>
-<body><main><h1>do-better</h1><p>Your local server is running.</p>
-<p>The UI is coming next. No API test is running.</p></main></body>
-</html>`;
+const HOST = "127.0.0.1";
 
-export async function startLocalServer(port: number) {
-  const host = "127.0.0.1";
+// The built UI needs its own scripts, styles, fonts, and images. Inline style
+// attributes are still used by a few components, so style-src allows them.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+export interface LocalServerOptions {
+  /** Overrides the UI build directory; tests use a fixture. */
+  uiDirectory?: string;
+}
+
+export async function startLocalServer(port: number, options: LocalServerOptions = {}): Promise<Server> {
+  const uiDirectory = resolve(options.uiDirectory ?? DEFAULT_UI_DIRECTORY);
+  await assertUiBuild(uiDirectory);
+
   const server = createServer((req, res) => {
-    // Keep the local service inaccessible through attacker-controlled DNS names.
-    const address = server.address();
-    const expectedHost = typeof address === "object" && address ? `${host}:${address.port}` : "";
-    if (req.headers.host !== expectedHost) {
-      res.writeHead(403).end("Forbidden");
-      return;
-    }
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
-    if (req.url !== "/") {
-      res.writeHead(404).end("Not found");
-    } else if (req.method !== "GET" && req.method !== "HEAD") {
-      res.writeHead(405, { Allow: "GET, HEAD" }).end("Method not allowed");
-    } else {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(req.method === "HEAD" ? undefined : page);
-    }
+    serveRequest(req, res, server, uiDirectory).catch((error: unknown) => {
+      console.error(
+        `do-better: local UI request failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      if (res.headersSent) {
+        res.destroy();
+        return;
+      }
+      sendText(res, 500, "Internal server error");
+    });
   });
-  await new Promise<void>((resolve, reject) => {
+  await new Promise<void>((resolveListen, reject) => {
     server.once("error", reject);
-    server.listen(port, host, () => {
+    server.listen(port, HOST, () => {
       server.off("error", reject);
-      resolve();
+      resolveListen();
     });
   });
   return server;
+}
+
+async function assertUiBuild(uiDirectory: string) {
+  const entryPoint = join(uiDirectory, "index.html");
+  const message =
+    `The local UI build was not found at ${uiDirectory}. Run "bun run build:cli" from the repository root, then start do-better again.`;
+  try {
+    const entry = await stat(entryPoint);
+    if (entry.isFile()) return;
+  } catch (error) {
+    throw new Error(message, { cause: error });
+  }
+  throw new Error(message);
+}
+
+async function serveRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  server: Server,
+  uiDirectory: string,
+) {
+  // Keep the local service inaccessible through attacker-controlled DNS names.
+  const address = server.address();
+  const expectedHost = typeof address === "object" && address ? `${HOST}:${address.port}` : "";
+  if (req.headers.host !== expectedHost) {
+    sendText(res, 403, "Forbidden");
+    return;
+  }
+
+  setSecurityHeaders(res);
+
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.setHeader("Allow", "GET, HEAD");
+    sendText(res, 405, "Method not allowed");
+    return;
+  }
+
+  let pathname: string;
+  try {
+    pathname = new URL(req.url ?? "/", `http://${HOST}`).pathname;
+  } catch {
+    sendText(res, 400, "Bad request");
+    return;
+  }
+
+  const request = resolveUiRequest(uiDirectory, pathname);
+  if (request.kind === "not-found") {
+    sendText(res, 404, "Not found");
+    return;
+  }
+
+  const filePath = request.kind === "file" ? request.filePath : join(uiDirectory, "index.html");
+  const body = await readFile(filePath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT" || error.code === "EISDIR") return null;
+    throw error;
+  });
+  if (!body) {
+    sendText(res, 404, "Not found");
+    return;
+  }
+
+  res.writeHead(200, {
+    "Content-Type": contentTypeFor(filePath),
+    "Content-Length": body.byteLength,
+    "Cache-Control": request.kind === "file" && request.immutable
+      ? "public, max-age=31536000, immutable"
+      : "no-store",
+  });
+  res.end(req.method === "HEAD" ? undefined : body);
+}
+
+function setSecurityHeaders(res: ServerResponse) {
+  res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+}
+
+function sendText(res: ServerResponse, status: number, message: string) {
+  res.writeHead(status, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(message);
 }

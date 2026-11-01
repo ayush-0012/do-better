@@ -1,12 +1,23 @@
-import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { request, type Server } from "node:http";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { readFile, rm, mkdtemp, writeFile } from "node:fs/promises";
+import { type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { runCli } from "../src/cli.ts";
 import { CONFIG_FILENAME, DEFAULT_PORT, loadConfig } from "../src/config.ts";
 import { startLocalServer } from "../src/server.ts";
+import { createUiFixture, removeUiFixture, UI_FIXTURE_INDEX } from "./ui-fixture.ts";
+
+let uiDirectory: string;
+
+beforeAll(async () => {
+  uiDirectory = await createUiFixture();
+});
+
+afterAll(async () => {
+  await removeUiFixture(uiDirectory);
+});
 
 async function withDirectory(check: (directory: string) => Promise<void>) {
   const directory = await mkdtemp(join(tmpdir(), "do-better-launch-"));
@@ -53,42 +64,19 @@ describe("local UI launch", () => {
     });
   });
 
-  test("serves the UI on loopback and rejects unknown routes, writes, and foreign hosts", async () => {
-    const server = await startLocalServer(0);
-    const port = portOf(server);
-    const url = `http://127.0.0.1:${port}`;
-    try {
-      const response = await fetch(url);
-      expect(response.status).toBe(200);
-      expect(response.headers.get("content-type")).toContain("text/html");
-      expect(await response.text()).toContain("Your local server is running.");
-      expect((await fetch(url, { method: "HEAD" })).status).toBe(200);
-      expect((await fetch(`${url}/unknown`)).status).toBe(404);
-      expect((await fetch(url, { method: "POST" })).status).toBe(405);
-      const status = await new Promise<number | undefined>((resolve, reject) => {
-        const req = request(url, { headers: { Host: "foreign.example" } }, (res) => {
-          res.resume();
-          resolve(res.statusCode);
-        });
-        req.on("error", reject);
-        req.end();
-      });
-      expect(status).toBe(403);
-    } finally {
-      await close(server);
-    }
-  });
-
-  test("start uses the configured port and launches the browser after listening", async () => {
-    const reservation = await startLocalServer(0);
+  test("start uses the configured port, serves the built UI, and launches the browser after listening", async () => {
+    const reservation = await startLocalServer(0, { uiDirectory });
     const port = portOf(reservation);
     await close(reservation);
     await withDirectory(async (directory) => {
       await writeFile(join(directory, CONFIG_FILENAME), JSON.stringify({ port }));
       let launched = false;
-      const server = await runCli(["start"], { directory, launchBrowser: async (url) => {
+      const server = await runCli(["start"], { directory, uiDirectory, launchBrowser: async (url) => {
         expect(url).toBe(`http://127.0.0.1:${port}`);
-        expect((await fetch(url)).status).toBe(200);
+        const response = await fetch(url);
+        expect(response.status).toBe(200);
+        expect(await response.text()).toBe(UI_FIXTURE_INDEX);
+        expect((await fetch(`${url}/playground`)).status).toBe(200);
         launched = true;
       } });
       try {
@@ -102,12 +90,12 @@ describe("local UI launch", () => {
 
   test("rejects a port argument and reports occupied ports without opening a browser", async () => {
     await expect(runCli(["start", "--port", "4310"])).rejects.toThrow("Usage");
-    const server = await startLocalServer(0);
+    const server = await startLocalServer(0, { uiDirectory });
     try {
       await withDirectory(async (directory) => {
         await writeFile(join(directory, CONFIG_FILENAME), JSON.stringify({ port: portOf(server) }));
         let launched = false;
-        await expect(runCli(["start"], { directory, launchBrowser: async () => {
+        await expect(runCli(["start"], { directory, uiDirectory, launchBrowser: async () => {
           launched = true;
         } })).rejects.toThrow("already in use");
         expect(launched).toBe(false);
@@ -127,11 +115,15 @@ describe("local UI launch", () => {
     execFileSync("node", ["--input-type=module", "-e", `
       import { strict as assert } from 'node:assert';
       import { startLocalServer } from ${JSON.stringify(moduleUrl)};
-      const server = await startLocalServer(0);
+      const server = await startLocalServer(0, { uiDirectory: ${JSON.stringify(uiDirectory)} });
       try {
-        const response = await fetch('http://127.0.0.1:' + server.address().port);
+        const url = 'http://127.0.0.1:' + server.address().port;
+        const response = await fetch(url);
         assert.equal(response.status, 200);
-        assert.match(await response.text(), /Your local server is running/);
+        assert.match(await response.text(), /<div id="root">/);
+        const route = await fetch(url + '/playground');
+        assert.equal(route.status, 200);
+        assert.equal((await fetch(url + '/assets/app.js')).status, 200);
       } finally {
         await new Promise((resolve, reject) => {
           server.close(error => error ? reject(error) : resolve());

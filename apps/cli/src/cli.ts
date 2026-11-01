@@ -2,9 +2,16 @@ import { loadConfig } from "./config.ts";
 import { openBrowser } from "./browser.ts";
 import { startLocalServer } from "./server.ts";
 
+export interface CliOptions {
+  directory?: string;
+  launchBrowser?: (url: string) => Promise<void>;
+  /** Overrides the UI build directory; tests use a fixture. */
+  uiDirectory?: string;
+}
+
 export async function runCli(
   args: string[],
-  { directory = process.cwd(), launchBrowser = openBrowser } = {},
+  { directory = process.cwd(), launchBrowser = openBrowser, uiDirectory }: CliOptions = {},
 ) {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
     console.log("Usage: do-better start\nPort: do-better.config.json in the current directory (default: 4310).");
@@ -14,7 +21,7 @@ export async function runCli(
     throw new Error("Usage: do-better start (set the port in do-better.config.json)");
   }
   const { port } = await loadConfig(directory);
-  const server = await startLocalServer(port).catch((error: NodeJS.ErrnoException) => {
+  const server = await startLocalServer(port, { uiDirectory }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "EADDRINUSE") {
       throw new Error(`Port ${port} is already in use. Stop the other process or change port in do-better.config.json.`);
     }

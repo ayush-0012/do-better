@@ -14,8 +14,9 @@ bun run --cwd apps/cli/ui build
 ```
 
 The dev command prints the local Vite URL. `build` writes static assets to
-`apps/cli/ui/dist`. The CLI runner still serves its original placeholder;
-serving this React build through `do-better start` is a separate integration step.
+`apps/cli/ui/dist`. From the repository root, `bun run build:cli` builds the UI
+and then the CLI, so `do-better start` serves this build. The CLI returns a clear
+error if the build is missing.
 
 Routes are defined in `src/router.tsx`; `src/main.tsx` provides the Query client.
 Shared components live in `src/components/ui`, with theme tokens in
@@ -37,7 +38,7 @@ loading run configurations work locally. Validate request checks configuration,
 marks individual invalid fields, and clears errors as input is corrected. The
 preview explains that execution is not connected; it never sends target requests.
 Drafts and target secrets stay in memory. Only the theme is stored in localStorage.
-Auth, master uploads, runner status, and serving this build from the CLI are pending.
+Auth, master uploads, and runner status are pending.
 
 The exports are design references, not an API specification. Unsupported generated
 claims (Homebrew installation, p95/p99, time-series data, encrypted SQLite export,

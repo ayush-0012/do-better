@@ -188,10 +188,15 @@ Live OAuth smoke tests remain a separate step: configure real credentials, start
 
 ### Launching the local UI server
 
-The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves a placeholder UI,
-and opens its URL in the default browser. Stop it with Ctrl+C. The React UI screens
-are implemented separately in `apps/cli/ui`; serving that build from the CLI and
-connecting the request execution/upload endpoints are still pending.
+The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves the built React UI
+from `apps/cli/ui/dist`, and opens its URL in the default browser. Stop it with Ctrl+C.
+Connecting the request execution/upload endpoints is still pending.
+
+Build the UI and the launch command from the repository root before the first start:
+
+```sh
+bun run build:cli
+```
 
 Until npm installation/publishing is set up, launch from the repository root with:
 
@@ -199,9 +204,10 @@ Until npm installation/publishing is set up, launch from the repository root wit
 node apps/cli/src/index.ts start
 ```
 
-`bun run --cwd apps/cli build` compiles the launch command to
-`apps/cli/dist/index.js` for the package executable. Global installation and npm
-publishing remain deferred.
+`bun run build:cli` builds the UI first and then compiles the launch command to
+`apps/cli/dist/index.js` for the package executable. `do-better start` exits with a
+clear error if the UI build is missing. Global installation and npm publishing
+remain deferred.
 
 The CLI requires Node.js 22.18 or newer. It reads optional
 `do-better.config.json` from the directory where the command is run:
@@ -222,7 +228,7 @@ overview, playground, history, results, and settings. The UI supports light/dark
 themes and uses labeled sample results until the runner and master are connected.
 See [the UI README](apps/cli/ui/README.md) for verification and module details.
 
-`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command and local UI server are implemented; connecting the React UI and local request execution/upload endpoints is pending.
+`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command and local UI server are implemented; connecting local request execution/upload endpoints is pending.
 
 Results contain run timestamps, elapsed seconds, a stop reason, and these metrics:
 
