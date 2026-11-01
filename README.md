@@ -190,7 +190,7 @@ Live OAuth smoke tests remain a separate step: configure real credentials, start
 
 The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves the built React UI
 from `apps/cli/ui/dist`, and opens its URL in the default browser. Stop it with Ctrl+C.
-Connecting the request execution/upload endpoints is still pending.
+Connecting the master upload endpoints is still pending.
 
 Build the UI and the launch command from the repository root before the first start:
 
@@ -221,14 +221,19 @@ option. Invalid configuration or an occupied port fails with a clear error; the
 CLI does not silently choose another port. If browser opening fails, use the URL
 printed in the terminal.
 
+While the CLI is running, the UI uses `GET /api/runner`, `POST /api/runs`, and
+`GET /api/runs/:id` to run tests and open their reports. Recent runs are kept in
+memory and are lost when the server restarts.
+
 Run CLI and engine checks with `bun run --cwd apps/cli test`.
 
 Run `bun run --cwd apps/cli/ui dev` to preview the Stitch-based landing page,
 overview, playground, history, results, and settings. The UI supports light/dark
-themes and uses labeled sample results until the runner and master are connected.
+themes, executes runs through the local runner, and uses sample history until
+master-backed reports are connected.
 See [the UI README](apps/cli/ui/README.md) for verification and module details.
 
-`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command and local UI server are implemented; connecting local request execution/upload endpoints is pending.
+`runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command, local UI server, and local execution API are implemented; connecting the master upload endpoints is pending.
 
 Results contain run timestamps, elapsed seconds, a stop reason, and these metrics:
 
