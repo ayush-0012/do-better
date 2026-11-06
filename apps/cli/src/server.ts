@@ -1,11 +1,20 @@
 import { readFile, stat } from "node:fs/promises";
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import { join, resolve } from "node:path";
 import { AccountService } from "./account.ts";
 import { handleLocalApi } from "./api.ts";
 import { openBrowser } from "./browser.ts";
 import { DEFAULT_API_URL } from "./config.ts";
-import { contentTypeFor, DEFAULT_UI_DIRECTORY, resolveUiRequest } from "./ui-assets.ts";
+import {
+  contentTypeFor,
+  DEFAULT_UI_DIRECTORY,
+  resolveUiRequest,
+} from "./ui-assets.ts";
 import { UploadService } from "./uploads.ts";
 
 const HOST = "127.0.0.1";
@@ -37,7 +46,10 @@ export interface LocalServerOptions {
   awaitSessionCheck?: boolean;
 }
 
-export async function startLocalServer(port: number, options: LocalServerOptions = {}): Promise<Server> {
+export async function startLocalServer(
+  port: number,
+  options: LocalServerOptions = {},
+): Promise<Server> {
   const uiDirectory = resolve(options.uiDirectory ?? DEFAULT_UI_DIRECTORY);
   await assertUiBuild(uiDirectory);
 
@@ -46,19 +58,24 @@ export async function startLocalServer(port: number, options: LocalServerOptions
     stateDirectory: options.stateDirectory,
     launchBrowser: options.launchBrowser ?? openBrowser,
   });
-  const uploads = new UploadService({ account, stateDirectory: options.stateDirectory });
+  const uploads = new UploadService({
+    account,
+    stateDirectory: options.stateDirectory,
+  });
 
   const server = createServer((req, res) => {
-    serveRequest(req, res, server, uiDirectory, account, uploads).catch((error: unknown) => {
-      console.error(
-        `do-better: local UI request failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      if (res.headersSent) {
-        res.destroy();
-        return;
-      }
-      sendText(res, 500, "Internal server error");
-    });
+    serveRequest(req, res, server, uiDirectory, account, uploads).catch(
+      (error: unknown) => {
+        console.error(
+          `do-better: local UI request failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        if (res.headersSent) {
+          res.destroy();
+          return;
+        }
+        sendText(res, 500, "Internal server error");
+      },
+    );
   });
   await new Promise<void>((resolveListen, reject) => {
     server.once("error", reject);
@@ -69,13 +86,15 @@ export async function startLocalServer(port: number, options: LocalServerOptions
   });
 
   const address = server.address();
-  if (typeof address === "object" && address) account.setLocalPort(address.port);
+  if (typeof address === "object" && address)
+    account.setLocalPort(address.port);
   if (options.awaitSessionCheck !== false) {
     await Promise.all([account.initialize(), uploads.initialize()]);
     if (account.getStatus().state === "signed_in") void uploads.retryPending();
   } else {
     void Promise.all([account.initialize(), uploads.initialize()]).then(() => {
-      if (account.getStatus().state === "signed_in") void uploads.retryPending();
+      if (account.getStatus().state === "signed_in")
+        void uploads.retryPending();
     });
   }
   return server;
@@ -83,8 +102,7 @@ export async function startLocalServer(port: number, options: LocalServerOptions
 
 async function assertUiBuild(uiDirectory: string) {
   const entryPoint = join(uiDirectory, "index.html");
-  const message =
-    `The local UI build was not found at ${uiDirectory}. Run "bun run build:cli" from the repository root, then start do-better again.`;
+  const message = `The local UI build was not found at ${uiDirectory}. Run "bun run build:cli" from the repository root, then start do-better again.`;
   try {
     const entry = await stat(entryPoint);
     if (entry.isFile()) return;
@@ -104,7 +122,8 @@ async function serveRequest(
 ) {
   // Keep the local service inaccessible through attacker-controlled DNS names.
   const address = server.address();
-  const expectedHost = typeof address === "object" && address ? `${HOST}:${address.port}` : "";
+  const expectedHost =
+    typeof address === "object" && address ? `${HOST}:${address.port}` : "";
   if (req.headers.host !== expectedHost) {
     sendText(res, 403, "Forbidden");
     return;
@@ -120,7 +139,13 @@ async function serveRequest(
     return;
   }
 
-  if (await handleLocalApi(req, res, url, `http://${expectedHost}`, { account, uploads })) return;
+  if (
+    await handleLocalApi(req, res, url, `http://${expectedHost}`, {
+      account,
+      uploads,
+    })
+  )
+    return;
 
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET, HEAD");
@@ -134,11 +159,16 @@ async function serveRequest(
     return;
   }
 
-  const filePath = request.kind === "file" ? request.filePath : join(uiDirectory, "index.html");
-  const body = await readFile(filePath).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT" || error.code === "EISDIR") return null;
-    throw error;
-  });
+  const filePath =
+    request.kind === "file"
+      ? request.filePath
+      : join(uiDirectory, "index.html");
+  const body = await readFile(filePath).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT" || error.code === "EISDIR") return null;
+      throw error;
+    },
+  );
   if (!body) {
     sendText(res, 404, "Not found");
     return;
@@ -147,9 +177,10 @@ async function serveRequest(
   res.writeHead(200, {
     "Content-Type": contentTypeFor(filePath),
     "Content-Length": body.byteLength,
-    "Cache-Control": request.kind === "file" && request.immutable
-      ? "public, max-age=31536000, immutable"
-      : "no-store",
+    "Cache-Control":
+      request.kind === "file" && request.immutable
+        ? "public, max-age=31536000, immutable"
+        : "no-store",
   });
   res.end(req.method === "HEAD" ? undefined : body);
 }
