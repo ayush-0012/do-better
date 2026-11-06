@@ -200,7 +200,14 @@ Live OAuth smoke tests remain a separate step: configure real credentials, start
 The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves the built React UI
 from `apps/cli/ui/dist`, and opens its URL in the default browser. Stop it with Ctrl+C.
 
-Build and pack the CLI from the repository root:
+Install the CLI from npm and start it:
+
+```sh
+npm install -g do-better-cli
+do-better start
+```
+
+To build and pack the CLI from source, run these commands from the repository root:
 
 ```sh
 bun run build:cli
@@ -208,11 +215,11 @@ npm pack ./apps/cli
 ```
 
 This produces `do-better-cli-0.1.0.tgz` with the compiled command and UI assets.
-Install it in the project where you want to run load tests:
+To test that tarball locally, install it globally:
 
 ```sh
-npm install /path/to/do-better-cli-0.1.0.tgz
-npm exec -- do-better start
+npm install -g ./do-better-cli-0.1.0.tgz
+do-better start
 ```
 
 For development, run `bun start` from `apps/cli` after building the UI.

@@ -20,7 +20,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "build:cli": "turbo run build -F @do-better/cli",
+    "build:cli": "turbo run build -F do-better-cli",
     "check-types": "turbo run check-types",
     "dev:server": "turbo run dev -F server --",
     "db:push": "turbo run db:push -F @do-better/db --",

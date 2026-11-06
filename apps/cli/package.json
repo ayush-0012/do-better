@@ -1,5 +1,5 @@
 {
-  "name": "@do-better/cli",
+  "name": "do-better-cli",
   "version": "0.1.0",
   "description": "Run HTTP load tests locally from a browser UI",
   "type": "module",
@@ -8,7 +8,7 @@
     "ui/dist"
   ],
   "bin": {
-    "do-better": "./dist/index.js"
+    "do-better": "dist/index.js"
   },
   "engines": {
     "node": ">=22.18.0"

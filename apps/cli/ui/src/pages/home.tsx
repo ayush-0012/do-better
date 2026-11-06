@@ -41,12 +41,12 @@ export function Home() {
         <div>
           <p className="eyebrow">CLI quickstart</p>
           <h2 id="quickstart-title" className="landing-heading">Install and launch</h2>
-          <p className="landing-intro"><code>@do-better/cli</code> requires Node.js 22.18 or newer. Install it from the package tarball in the project directory where you want to run tests.</p>
+          <p className="landing-intro"><code>do-better-cli</code> requires Node.js 22.18 or newer. Install it globally and launch it from the directory where you want to run tests.</p>
         </div>
         <div className="quickstart-commands">
           {[
-            { label: "01 · Install the tarball", command: "npm install /path/to/do-better-cli-0.1.0.tgz" },
-            { label: "02 · Start the local UI", command: "npm exec -- do-better start" },
+            { label: "01 · Install the CLI", command: "npm install -g do-better-cli" },
+            { label: "02 · Start the local UI", command: "do-better start" },
           ].map(({ label, command }) => <div key={label}>
             <h3 className="eyebrow">{label}</h3>
             <div className="command-bar"><code>{command}</code><CopyButton value={command} /></div>
