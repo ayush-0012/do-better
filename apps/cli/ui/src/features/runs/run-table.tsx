@@ -8,8 +8,8 @@ import { formatLatency, formatNumber, patternLabels, stopReasonLabels, type RunR
 export function RunTable({ runs }: { runs: RunRecord[] }) {
   const { loadConfiguration } = useRequestDraft();
   const navigate = useNavigate();
-  if (runs.length === 0) return <EmptyState title="No matching runs" description="Try another endpoint, outcome, or date range." />;
-  return <div className="table-scroll"><table className="run-table"><caption className="sr-only">Sample API test runs</caption><thead><tr>
+  if (runs.length === 0) return <EmptyState title="No matching runs" description="Try another endpoint or outcome." />;
+  return <div className="table-scroll"><table className="run-table"><caption className="sr-only">API test runs</caption><thead><tr>
     <th scope="col">Target URL</th><th scope="col">Pattern</th><th scope="col">Duration</th><th scope="col">Completed</th><th scope="col">Failed</th><th scope="col">Stop reason</th><th scope="col">Actions</th>
   </tr></thead><tbody>{runs.map((run) => <tr key={run.result.id}><td><div className="table-target"><span className="method-badge small">POST</span><code>{run.configuration.url}</code></div>
     <span className="table-secondary">{new Date(run.result.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span></td>

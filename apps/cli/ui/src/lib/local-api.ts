@@ -51,6 +51,37 @@ export interface RetrySummary {
   error?: string;
 }
 
+export interface SavedRun extends RunRecord {
+  projectId: string;
+  createdAt: string;
+}
+
+export interface SavedRunList {
+  runs: SavedRun[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface SavedRunsSummary {
+  totalRuns: number;
+  endpointCount: number;
+  completed: number;
+  stoppedEarly: number;
+  requestsStarted: number;
+  requestsSucceeded: number;
+  successRate: number | null;
+  latestRun: SavedRun | null;
+}
+
+export interface SavedRunQuery {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  outcome?: "all" | "completed" | "stopped";
+  sort?: "newest" | "oldest";
+}
+
 export class LocalApiError extends Error {
   constructor(
     message: string,
@@ -66,6 +97,10 @@ export const runnerQueryKey = ["runner"] as const;
 export const runQueryKey = (runId: string) => ["run", runId] as const;
 export const accountQueryKey = ["account"] as const;
 export const pendingUploadsQueryKey = ["pending-uploads"] as const;
+export const savedRunsRootQueryKey = ["saved-runs"] as const;
+export const savedRunsQueryKey = (query: SavedRunQuery = {}) => ["saved-runs", "list", query] as const;
+export const savedRunsSummaryQueryKey = ["saved-runs", "summary"] as const;
+export const savedRunQueryKey = (runId: string) => ["saved-runs", "detail", runId] as const;
 
 export async function getRunnerStatus(): Promise<RunnerStatus> {
   return readJson<RunnerStatus>(await request("/api/runner"));
@@ -110,6 +145,16 @@ export async function signIn(email: string, password: string) {
   return payload;
 }
 
+export async function signUp(name: string, email: string, password: string) {
+  return readJson<{ account: AccountSnapshot; retry: RetrySummary }>(
+    await request("/api/account/sign-up", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    }),
+  );
+}
+
 export async function signOut() {
   return readJson<{ account: AccountSnapshot; warning?: string }>(
     await request("/api/account/sign-out", { method: "POST" }),
@@ -128,6 +173,28 @@ export async function startOAuth(provider: "google" | "github") {
 
 export async function getPendingUploads(): Promise<PendingUploadSummary> {
   return readJson<PendingUploadSummary>(await request("/api/uploads"));
+}
+
+export async function getSavedRuns(query: SavedRunQuery = {}): Promise<SavedRunList> {
+  const params = new URLSearchParams();
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.offset !== undefined) params.set("offset", String(query.offset));
+  if (query.search) params.set("search", query.search);
+  if (query.outcome && query.outcome !== "all") params.set("outcome", query.outcome);
+  if (query.sort) params.set("sort", query.sort);
+  const suffix = params.toString();
+  return readJson<SavedRunList>(await request(`/api/saved-runs${suffix ? `?${suffix}` : ""}`));
+}
+
+export async function getSavedRunsSummary(): Promise<SavedRunsSummary> {
+  return readJson<SavedRunsSummary>(await request("/api/saved-runs/summary"));
+}
+
+export async function getSavedRun(runId: string): Promise<SavedRun> {
+  const payload = await readJson<{ run: SavedRun }>(
+    await request(`/api/saved-runs/${encodeURIComponent(runId)}`),
+  );
+  return payload.run;
 }
 
 export async function retryPendingUploads(): Promise<RetrySummary> {

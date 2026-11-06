@@ -10,7 +10,7 @@ import { StatusDistribution } from "@/features/runs/status-distribution";
 import { PatternPreview } from "@/features/playground/pattern-preview";
 import { useRequestDraft } from "@/features/playground/draft-provider";
 import { useRetryRunUpload, useAccount } from "@/features/account/use-account";
-import { sampleRuns } from "@/features/runs/sample-runs";
+import { useSavedRun } from "@/features/history/use-saved-runs";
 import { formatLatency, patternLabels, stopReasonLabels } from "@/lib/run-types";
 import { getRun, runQueryKey, type RunUploadState } from "@/lib/local-api";
 import { downloadJson } from "@/lib/download-json";
@@ -19,24 +19,28 @@ export function RunResultsPage({ runId }: { runId: string }) {
   const localRun = useQuery({ queryKey: runQueryKey(runId), queryFn: () => getRun(runId), retry: false });
   const retryUpload = useRetryRunUpload(runId);
   const account = useAccount();
+  const canLoadSavedRun = account.data?.state === "signed_in" && localRun.isSuccess && localRun.data === null;
+  const savedRun = useSavedRun(runId, canLoadSavedRun);
   const { loadConfiguration } = useRequestDraft();
   const navigate = useNavigate();
-  const sampleRun = sampleRuns.find((entry) => entry.result.id === runId);
-  const run = localRun.data?.run ?? sampleRun;
+  const run = localRun.data?.run ?? savedRun.data;
   const upload = localRun.data?.upload;
   const isLocalRun = localRun.data?.run != null;
+  const savedIsLoading = canLoadSavedRun && savedRun.isPending;
+  const accountIsChecking = localRun.isSuccess && localRun.data === null && account.isPending;
+  const loadError = localRun.isError ? localRun.error : savedRun.error;
 
-  if (!run && localRun.isPending) {
-    return <div className="page-container"><section className="panel" role="status"><p>Loading this run from the local runner…</p></section></div>;
+  if (!run && (localRun.isPending || savedIsLoading || accountIsChecking)) {
+    return <div className="page-container"><section className="panel" role="status"><p>Loading this run…</p></section></div>;
   }
-  if (!run && localRun.isError) {
-    return <div className="page-container"><EmptyState title="Local runner unavailable"
-      description={localRun.error instanceof Error ? localRun.error.message : "The local runner could not load this run."}
-      action={<Button onClick={() => void localRun.refetch()}>Try again</Button>} /></div>;
+  if (!run && loadError) {
+    return <div className="page-container"><EmptyState title="Run unavailable"
+      description={loadError instanceof Error ? loadError.message : "The run could not be loaded."}
+      action={<Button onClick={() => { void localRun.refetch(); void savedRun.refetch(); }}>Try again</Button>} /></div>;
   }
   if (!run) {
     return <div className="page-container"><EmptyState title="Run not found"
-      description="Runs are kept in memory for this session and disappear when the CLI server restarts."
+      description="Runs are kept in memory for this session. Sign in to open saved runs from the master."
       action={<Button asChild><Link to="/history">Back to history</Link></Button>} /></div>;
   }
 
@@ -44,12 +48,12 @@ export function RunResultsPage({ runId }: { runId: string }) {
   const loadInPlayground = () => { loadConfiguration(configuration); void navigate({ to: "/playground" }); };
   return <div className="page-container"><Link to="/history" className="back-link"><ArrowLeft size={18} />Back to history</Link>
     <PageHeading eyebrow="Execution report" title={`Run results: ${new URL(configuration.url).pathname}`}
-      description={isLocalRun ? "A clear view of what this local run returned." : "A clear view of what this sample execution returned."} actions={<>
-      <Button variant="outline" onClick={() => downloadJson(run, `do-better-${isLocalRun ? "local" : "sample"}-${result.id}.json`)}><Download />Export JSON</Button>
+      description={isLocalRun ? "A clear view of what this local run returned." : "A clear view of what this saved run returned."} actions={<>
+      <Button variant="outline" onClick={() => downloadJson(run, `do-better-${isLocalRun ? "local" : "saved"}-${result.id}.json`)}><Download />Export JSON</Button>
       <Button onClick={loadInPlayground}>Run again in Playground<ArrowRight /></Button></>} />
     <div className="panel run-context"><div><div className="target-line"><span className="method-badge">POST</span><code>{configuration.url}</code></div><p className={result.stopReason === "duration_elapsed" ? "text-success" : "text-danger"}>{stopReasonLabels[result.stopReason]} · {result.elapsedSeconds}s elapsed</p></div>
       <div className="run-context-actions">
-        <span className={`quiet-tag ${isLocalRun && upload?.state === "uploaded" ? "text-success" : ""}`}>{isLocalRun ? uploadLabel(upload) : "Sample report"}</span>
+        <span className={`quiet-tag ${isLocalRun && upload?.state === "uploaded" ? "text-success" : !isLocalRun ? "text-success" : ""}`}>{isLocalRun ? uploadLabel(upload) : "Saved to master"}</span>
         {isLocalRun && upload?.state === "pending" && <Button size="sm" variant="outline" onClick={() => retryUpload.mutate()} disabled={retryUpload.isPending}>{retryUpload.isPending ? "Saving…" : "Retry save"}</Button>}
         {isLocalRun && upload?.state === "not_signed_in" && (account.data?.state === "signed_in"
           ? <Button size="sm" variant="outline" onClick={() => retryUpload.mutate()} disabled={retryUpload.isPending}>{retryUpload.isPending ? "Saving…" : "Save now"}</Button>
@@ -58,7 +62,7 @@ export function RunResultsPage({ runId }: { runId: string }) {
     {isLocalRun && upload?.state === "pending" && <div className="notice notice-error" role="status"><strong>Not saved yet.</strong> {upload.error}</div>}
     {isLocalRun && upload?.state === "not_signed_in" && <div className="notice" role="note"><strong>Local only.</strong> {account.data?.state === "signed_in" ? "Save this run's metrics to the master server." : "Sign in from Settings to save this run's metrics to the master server."}</div>}
     {retryUpload.error && <div className="notice notice-error" role="alert">{retryUpload.error instanceof Error ? retryUpload.error.message : "The run could not be saved."}</div>}
-    {result.error && <div role="note" className="notice notice-error">{result.error}. Partial metrics are preserved in this {isLocalRun ? "run" : "sample"}.</div>}
+    {result.error && <div role="note" className="notice notice-error">{result.error}. Partial metrics are preserved in this run.</div>}
     <div className="report-grid"><div className="report-main"><RunSummary run={run} />
       <section className="panel report-section"><div className="section-title"><h2><Timer size={22} className="accent-icon" />Measured latency bounds</h2></div>
         <div className="latency-grid"><MetricCard label="Minimum" value={formatLatency(result.metrics.latencyMs.min)} /><MetricCard label="Average" value={formatLatency(result.metrics.latencyMs.average)} /><MetricCard label="Maximum" value={formatLatency(result.metrics.latencyMs.max)} /></div>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRunnerStatus, pendingUploadsQueryKey, runQueryKey, runnerQueryKey, startRun } from "@/lib/local-api";
+import { getRunnerStatus, pendingUploadsQueryKey, runQueryKey, runnerQueryKey, savedRunsRootQueryKey, startRun } from "@/lib/local-api";
 import type { EngineParams } from "@/lib/run-types";
 
 export function useRunnerStatus() {
@@ -19,6 +19,7 @@ export function useStartRun() {
       queryClient.setQueryData(runQueryKey(payload.run.result.id), payload);
       void queryClient.invalidateQueries({ queryKey: runnerQueryKey });
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }

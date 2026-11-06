@@ -1,5 +1,5 @@
-import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { FlaskConical, Moon, Sun, UserRound } from "lucide-react";
+import { Link, Outlet } from "@tanstack/react-router";
+import { Moon, Sun, UserRound } from "lucide-react";
 import { Brand } from "@/components/layout/brand";
 import { Button } from "@/components/ui/button";
 import { useAppearance } from "@/features/settings/appearance-provider";
@@ -13,7 +13,6 @@ const navigation = [
 
 export function AppShell() {
   const { theme, setTheme } = useAppearance();
-  const { pathname } = useLocation();
   const runner = useRunnerStatus();
   const account = useAccount();
   const runnerState = runner.data?.state;
@@ -23,7 +22,6 @@ export function AppShell() {
   const accountLabel = accountState === "signed_in"
     ? account.data?.user?.name || account.data?.user?.email || "Account"
     : accountState === "unavailable" ? "Account offline" : accountState === "checking" ? "Checking account" : "Sign in";
-  const showSamples = pathname === "/overview" || pathname === "/history";
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Skip to content</a>
     <header className="app-header"><div className="header-inner">
@@ -37,7 +35,6 @@ export function AppShell() {
         <Link to="/settings" className="account-link" aria-label={`Account: ${accountLabel}`} title={accountLabel}><UserRound size={18} /><span>{accountLabel}</span></Link>
       </div>
     </div></header>
-    {showSamples && <div className="sample-notice"><FlaskConical size={14} aria-hidden="true" /><span>Sample history · Completed runs save to the master when you are signed in.</span></div>}
     <main id="main-content" tabIndex={-1}><Outlet /></main>
     <footer className="app-footer"><span><strong>do-better</strong> <span className="footer-dot">·</span> Built for local API testing</span><span>Configure. Run. Understand.</span></footer>
   </div>;

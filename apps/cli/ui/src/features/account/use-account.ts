@@ -7,7 +7,9 @@ import {
   retryPendingUploads,
   retryRunUpload,
   runQueryKey,
+  savedRunsRootQueryKey,
   signIn,
+  signUp,
   signOut,
   startOAuth,
 } from "@/lib/local-api";
@@ -39,6 +41,19 @@ export function useSignIn() {
     onSuccess: ({ account }) => {
       queryClient.setQueryData(accountQueryKey, account);
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
+    },
+  });
+}
+
+export function useSignUp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, email, password }: { name: string; email: string; password: string }) => signUp(name, email, password),
+    onSuccess: ({ account }) => {
+      queryClient.setQueryData(accountQueryKey, account);
+      void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }
@@ -50,6 +65,7 @@ export function useSignOut() {
     onSuccess: ({ account }) => {
       queryClient.setQueryData(accountQueryKey, account);
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }
@@ -71,6 +87,7 @@ export function useRetryPendingUploads() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
       void queryClient.invalidateQueries({ queryKey: accountQueryKey });
+      void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }
@@ -85,6 +102,7 @@ export function useRetryRunUpload(runId: string) {
       );
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
       void queryClient.invalidateQueries({ queryKey: accountQueryKey });
+      void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }
