@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { AccountError, type AccountService } from "./account.ts";
 import { engineParamsSchema } from "./constants.ts";
 import { getLocalRun, getRunnerStatus, RunnerBusyError, startLocalRun } from "./runner.ts";
+import { fetchSavedRun, fetchSavedRuns, fetchSavedRunsSummary } from "./saved-runs.ts";
 import type { UploadService } from "./uploads.ts";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -70,9 +71,15 @@ async function route(
   if (url.pathname === "/api/runs") {
     requireMethod(req, "POST");
     requireOrigin(req, expectedOrigin);
+    if (account.getStatus().state !== "signed_in") {
+      throw new ApiError(401, "Sign in before starting a run.");
+    }
     const params = engineParamsSchema.safeParse(await readJsonPayload(req));
     if (!params.success) {
       throw new ApiError(400, "The run configuration is invalid.", params.error.issues);
+    }
+    if (account.getStatus().state !== "signed_in") {
+      throw new ApiError(401, "Sign in before starting a run.");
     }
 
     try {
@@ -124,6 +131,24 @@ async function route(
     return;
   }
 
+  if (url.pathname === "/api/account/sign-up") {
+    requireMethod(req, "POST");
+    requireOrigin(req, expectedOrigin);
+    const payload = await readJsonPayload(req);
+    const { email, password } = readSignInPayload(payload);
+    const name = (payload as { name?: unknown }).name;
+    if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
+      throw new ApiError(400, "Enter a name of up to 100 characters.");
+    }
+    if (password.length < 8 || password.length > 128) {
+      throw new ApiError(400, "Use a password between 8 and 128 characters.");
+    }
+    await account.signUp(name.trim(), email, password);
+    const retry = await uploads.retryPending();
+    sendJson(res, 200, { account: await accountSnapshot(account, uploads), retry });
+    return;
+  }
+
   if (url.pathname === "/api/account/sign-out") {
     requireMethod(req, "POST");
     requireOrigin(req, expectedOrigin);
@@ -145,6 +170,25 @@ async function route(
   if (url.pathname === "/api/account/oauth/complete") {
     requireMethod(req, "GET");
     await completeOAuth(res, url, account, uploads);
+    return;
+  }
+
+  if (url.pathname === "/api/saved-runs") {
+    requireMethod(req, "GET");
+    sendJson(res, 200, await fetchSavedRuns(account, url.searchParams));
+    return;
+  }
+
+  if (url.pathname === "/api/saved-runs/summary") {
+    requireMethod(req, "GET");
+    sendJson(res, 200, await fetchSavedRunsSummary(account));
+    return;
+  }
+
+  const savedRunId = savedRunIdFromPath(url.pathname);
+  if (savedRunId !== null) {
+    requireMethod(req, "GET");
+    sendJson(res, 200, await fetchSavedRun(account, savedRunId));
     return;
   }
 
@@ -264,6 +308,16 @@ function requireOrigin(req: IncomingMessage, expectedOrigin: string) {
 function requireMethod(req: IncomingMessage, method: string) {
   if (req.method !== method) {
     throw new ApiError(405, "Method not allowed.", undefined, method);
+  }
+}
+
+function savedRunIdFromPath(pathname: string) {
+  const match = /^\/api\/saved-runs\/([^/]+)$/.exec(pathname);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
   }
 }
 

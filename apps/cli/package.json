@@ -1,16 +1,24 @@
 {
   "name": "@do-better/cli",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Run HTTP load tests locally from a browser UI",
   "type": "module",
+  "files": [
+    "dist",
+    "ui/dist"
+  ],
   "bin": {
     "do-better": "./dist/index.js"
   },
   "engines": {
     "node": ">=22.18.0"
   },
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "start": "node src/index.ts start",
+    "start": "bun src/index.ts start",
     "test": "bun test tests",
     "check-types": "tsc --noEmit",
     "test:engine": "bun test tests/engine.test.ts"

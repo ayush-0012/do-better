@@ -88,9 +88,17 @@ export class AccountService {
   }
 
   async signIn(email: string, password: string) {
-    const response = await this.request("/api/auth/sign-in/email", {
+    return this.authenticateEmail("sign-in", { email, password });
+  }
+
+  async signUp(name: string, email: string, password: string) {
+    return this.authenticateEmail("sign-up", { name, email, password });
+  }
+
+  private async authenticateEmail(action: "sign-in" | "sign-up", credentials: { name?: string; email: string; password: string }) {
+    const response = await this.request(`/api/auth/${action}/email`, {
       method: "POST",
-      body: { email, password },
+      body: credentials,
     });
     const payload = await readResponse<{ user?: unknown }>(response);
     const startedSession = this.captureCookies(response.headers);

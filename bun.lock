@@ -17,6 +17,9 @@
     },
     "apps/cli": {
       "name": "@do-better/cli",
+      "dependencies": {
+        "zod": "^4.5.4",
+      },
       "bin": {
         "do-better": "./dist/index.js",
       },
