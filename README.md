@@ -97,7 +97,16 @@ Set these values in the server's ignored `apps/server/.env` file or deployment e
 | `GITHUB_CLIENT_ID` | GitHub OAuth application's client ID |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth application's client secret |
 
-All four provider settings are required. Keep OAuth secrets on the backend; do not include them in UI assets, the CLI package, or committed files. Run `bun run env:generate` from `apps/server` after editing its environment schema. The generated `src/env.ts` remains managed by Varlock.
+All four provider settings are optional for email/password authentication. A social provider is enabled on the backend only when both its client ID and secret are set. The current UI offers email/password only; Google/GitHub UI sign-in is deferred. Keep OAuth secrets on the backend; do not include them in UI assets, the CLI package, or committed files. Run `bun run env:generate` from `apps/server` after editing its environment schema. The generated `src/env.ts` remains managed by Varlock.
+
+### Email/password in the local UI
+
+Start the backend and CLI, choose **Sign in** on the landing page, then choose **Create an
+account**. Enter your name, email, and a password of 8–128 characters. Account
+creation signs you in immediately. Existing users can choose **Sign in**.
+The CLI holds and persists the backend session; passwords are never saved locally.
+No Google/GitHub credentials are needed. Email verification delivery and password
+recovery remain deferred until an email delivery service is configured.
 
 ### OAuth application registration
 
@@ -191,22 +200,22 @@ Live OAuth smoke tests remain a separate step: configure real credentials, start
 The CLI registers `do-better start` as its package executable. It binds to `127.0.0.1`, serves the built React UI
 from `apps/cli/ui/dist`, and opens its URL in the default browser. Stop it with Ctrl+C.
 
-Build the UI and the launch command from the repository root before the first start:
+Build and pack the CLI from the repository root:
 
 ```sh
 bun run build:cli
+npm pack ./apps/cli
 ```
 
-Until npm installation/publishing is set up, launch from the repository root with:
+This produces `do-better-cli-0.1.0.tgz` with the compiled command and UI assets.
+Install it in the project where you want to run load tests:
 
 ```sh
-node apps/cli/src/index.ts start
+npm install /path/to/do-better-cli-0.1.0.tgz
+npm exec -- do-better start
 ```
 
-`bun run build:cli` builds the UI first and then compiles the launch command to
-`apps/cli/dist/index.js` for the package executable. `do-better start` exits with a
-clear error if the UI build is missing. Global installation and npm publishing
-remain deferred.
+For development, run `bun start` from `apps/cli` after building the UI.
 
 The CLI requires Node.js 22.18 or newer. It reads optional
 `do-better.config.json` from the directory where the command is run:
@@ -229,7 +238,9 @@ survive locally through the retry queue described below.
 
 ### Signing in and saving runs
 
-Sign in from Settings with email and password, Google, or GitHub. The CLI stores
+Create an account or sign in from the landing page with email and password.
+The workspace and `POST /api/runs` require a signed-in account. Social sign-in
+buttons are currently hidden. The CLI stores
 the Better Auth session cookie at `~/.do-better/session.json` (owner-only, mode
 `0600`) and never sends it to the browser UI. On startup it validates the saved
 session with `GET /api/auth/get-session`; an invalid session is discarded, while
@@ -247,10 +258,23 @@ most 200 records) as `{ userId, projectId, params, result }`. The file contains
 the target URL and aggregate metrics, never headers or request bodies. Retry
 from the results page, from Settings, or automatically on the next sign-in and
 startup. Retrying only repeats the upload; the target is never rerun. Runs
-completed while signed out are labeled `not_signed_in` and are not queued; after
+completed after you sign out are labeled `not_signed_in` and are not queued; after
 signing in, their results page offers a one-time save action.
 
-Local account and upload endpoints:
+### Saved run history
+
+Overview and History read the signed-in user's saved runs from the master through
+the CLI. Workspace pages send signed-out visitors back to the landing page. History
+filters, sorting, and pagination run in the master API, so totals stay accurate
+beyond the first page. Run results open from CLI memory when available and fall
+back to the master for saved runs.
+
+The master stores uploads with duration in seconds and a rate normalized to
+requests per second; saved configurations therefore report `per_second` even when
+the original run used per-minute values. The API omits legacy rows whose stored
+result is missing or invalid.
+
+Local account, upload, and history endpoints:
 
 | Endpoint | Behavior |
 | --- | --- |
@@ -261,13 +285,16 @@ Local account and upload endpoints:
 | `GET /api/account/oauth/complete` | Validate state, exchange the one-time token |
 | `GET /api/uploads` | Count of runs waiting to upload |
 | `POST /api/uploads/retry` | Retry the signed-in user's pending uploads |
+| `GET /api/saved-runs` | Proxy saved runs with `limit`, `offset`, `search`, `outcome`, and `sort` |
+| `GET /api/saved-runs/summary` | Proxy aggregate history metrics and the latest run |
+| `GET /api/saved-runs/:id` | Proxy one saved run owned by the signed-in user |
 
 Run CLI and engine checks with `bun run --cwd apps/cli test`.
 
 Run `bun run --cwd apps/cli/ui dev` to preview the Stitch-based landing page,
 overview, playground, history, results, and settings. The UI supports light/dark
-themes, executes runs through the local runner, and uses sample history until
-more saved runs are available in the UI. See [the UI README](apps/cli/ui/README.md)
+themes, executes runs through the local runner, and shows saved master history
+on overview and history. See [the UI README](apps/cli/ui/README.md)
 for verification and module details.
 
 `runEngine(params)` in `apps/cli/src/engine.ts` executes POST requests to the configured target and returns an `EngineResult`. The CLI folder owns the engine, configuration/result schemas, scheduling helpers, and engine tests. The master imports the schemas for upload validation and handles authentication and database operations; it does not execute requests against the submitted URL. The launch command, local UI server, local execution API, account sign-in, and master uploads are implemented.
@@ -294,7 +321,15 @@ The authenticated master endpoints are:
 | `POST /api/projects` | Create a project belonging to the session's user; returns `{ "project": ... }` |
 | `POST /api/test-runs` | Validate and store `{ "projectId": ..., "params": ..., "result": ... }`; returns `{ "run": ... }` |
 | `GET /api/test-runs/:id` | Read a saved run owned by the session's user |
+| `GET /api/saved-runs` | List the user's saved runs with `limit` (1–100), `offset`, `search`, `outcome` (`all`, `completed`, `stopped`), and `sort` (`newest`, `oldest`) |
+| `GET /api/saved-runs/summary` | Aggregate run counts, request success, endpoint count, and the latest saved run |
+| `GET /api/saved-runs/:id` | Read one saved run in the same shape the local runner returns |
 | `GET /api/desktop/handoff` | Redirect a completed OAuth session to the local CLI with a single-use token |
+
+`GET /api/saved-runs` returns `{ "runs": [...], "total": ..., "limit": ..., "offset": ... }`.
+Each saved run contains its configuration, engine result, project ID, and upload
+time. Saved configurations are reconstructed from stored columns, so rates are
+reported per second and request headers/bodies remain absent.
 
 Use the existing engine parameters as `params`, omitting `requestData`, and the returned `EngineResult` as `result`. The server strips unrecognized fields, checks project ownership, normalizes duration to seconds and rate to requests per second, and stores only the validated result. No `userId` supplied by the client is trusted.
 

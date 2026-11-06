@@ -36,11 +36,16 @@ The Playground executes runs through the local runner and opens each result at
 `/runs/:id`; recent runs stay in the CLI server's memory for this session.
 Filtering, pagination, JSON downloads, theme preferences, configuration validation,
 header editing, and loading run configurations work locally. Drafts and target
-secrets stay in memory. Only the theme is stored in localStorage. Settings signs
-in with email/password, Google, or GitHub; the header shows the account state and
+secrets stay in memory. Only the theme is stored in localStorage. The landing page links to account creation and sign-in
+with email/password (social sign-in buttons are currently hidden); the header shows the account state and
 completed runs save to the master automatically. Results show whether a run was
-saved and offer a retry; Settings lists pending uploads. History and overview
-still use labeled sample reports.
+saved and offer a retry; Settings lists pending uploads.
+
+Overview and History load the signed-in account's saved runs through the CLI.
+History filtering, sorting, and pagination run on the master API, and exporting
+downloads the current page. All workspace pages require sign-in. Signed-out visitors are returned to the landing page.
+Run results use CLI memory first and then fetch saved runs from the master. The
+`sample-runs` fixture is no longer rendered.
 
 The exports are design references, not an API specification. Unsupported generated
 claims (Homebrew installation, p95/p99, time-series data, encrypted SQLite export,
