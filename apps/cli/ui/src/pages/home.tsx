@@ -51,8 +51,8 @@ export function Home() {
             <h3 className="eyebrow">{label}</h3>
             <div className="command-bar"><code>{command}</code><CopyButton value={command} /></div>
           </div>)}
-          <p className="help-text">For sign-in, run the account backend at <code>http://localhost:3000</code> or set <code>apiUrl</code> in <code>do-better.config.json</code> in your launch directory.</p>
-          <div className="command-bar"><code>{'{ "apiUrl": "http://localhost:3000" }'}</code><CopyButton value={'{ "apiUrl": "http://localhost:3000" }'} /></div>
+          <p className="help-text">Sign-in and saved reports use <code>https://do-better-production.up.railway.app</code>. To use another backend, set <code>apiUrl</code> in <code>do-better.config.json</code> in your launch directory.</p>
+          <div className="command-bar"><code>{'{ "apiUrl": "https://do-better-production.up.railway.app" }'}</code><CopyButton value={'{ "apiUrl": "https://do-better-production.up.railway.app" }'} /></div>
         </div>
       </div>
     </section>
