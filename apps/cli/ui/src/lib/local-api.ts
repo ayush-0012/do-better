@@ -187,7 +187,20 @@ export async function getSavedRuns(query: SavedRunQuery = {}): Promise<SavedRunL
 }
 
 export async function getSavedRunsSummary(): Promise<SavedRunsSummary> {
-  return readJson<SavedRunsSummary>(await request("/api/saved-runs/summary"));
+  const payload = await readJson<{ summary: SavedRunsSummary }>(
+    await request("/api/saved-runs/summary"),
+  );
+  const summary = payload.summary;
+  const counts = summary && [
+    summary.totalRuns, summary.endpointCount, summary.completed,
+    summary.stoppedEarly, summary.requestsStarted, summary.requestsSucceeded,
+  ];
+  if (!counts || counts.some((value) => !Number.isSafeInteger(value) || value < 0)
+    || (summary.successRate !== null
+      && (!Number.isFinite(summary.successRate) || summary.successRate < 0 || summary.successRate > 100))) {
+    throw new LocalApiError("Saved history summary is incomplete. Try again.", 502);
+  }
+  return summary;
 }
 
 export async function getSavedRun(runId: string): Promise<SavedRun> {

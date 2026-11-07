@@ -14,7 +14,7 @@ export function RunTable({ runs }: { runs: RunRecord[] }) {
   </tr></thead><tbody>{runs.map((run) => <tr key={run.result.id}><td><div className="table-target"><span className="method-badge small">POST</span><code>{run.configuration.url}</code></div>
     <span className="table-secondary">{new Date(run.result.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span></td>
     <td>{patternLabels[run.configuration.pattern]}<span className="table-secondary">{run.configuration.rate} req/{run.configuration.rateUnit === "per_second" ? "sec" : "min"}</span></td>
-    <td className="numeric">{run.result.elapsedSeconds}s</td><td className="numeric">{formatNumber(run.result.metrics.requestsCompleted)}</td>
+    <td className="numeric">{formatNumber(run.result.elapsedSeconds, 2)}s</td><td className="numeric">{formatNumber(run.result.metrics.requestsCompleted)}</td>
     <td className={run.result.metrics.requestsFailed ? "numeric text-danger" : "numeric text-success"}>{formatNumber(run.result.metrics.requestsFailed)}</td>
     <td><span className={`outcome-label ${run.result.stopReason === "duration_elapsed" ? "outcome-success" : "outcome-error"}`}><span className="status-dot" />{stopReasonLabels[run.result.stopReason]}</span>
     <span className="table-secondary">{formatLatency(run.result.metrics.latencyMs.average)} avg</span></td>
