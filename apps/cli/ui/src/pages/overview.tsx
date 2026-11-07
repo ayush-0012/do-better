@@ -24,7 +24,7 @@ export function OverviewPage() {
   const runnerDot = runnerState === "running" ? "status-running" : runnerState === "idle" ? "status-idle" : "status-unavailable";
 
   if (summaryQuery.isPending) {
-    return <div className="page-container"><section className="panel" role="status"><p>Loading saved runs from the master…</p></section></div>;
+    return <div className="page-container"><section className="panel" role="status"><p>Loading saved runs from your account…</p></section></div>;
   }
 
   if (summaryQuery.isError) {
@@ -49,7 +49,7 @@ export function OverviewPage() {
     <Button asChild><Link to="/playground"><Plus />New run</Link></Button></>} />
     <div className="instrument-strip"><div><span className={`status-dot ${runnerDot}`} /><div><p className="eyebrow">Runner</p><span>{runnerLabel}</span></div></div>
       <div><ShieldCheck size={18} /><div><p className="eyebrow">Execution</p><span>Target requests stay local</span></div></div>
-      <div><span className="preview-square" /><div><p className="eyebrow">Data source</p><span>Saved history from the master</span></div></div></div>
+      <div><span className="preview-square" /><div><p className="eyebrow">Data source</p><span>Saved history from your account</span></div></div></div>
     <section className="panel latest-run"><div className="latest-run-toolbar"><div className="target-line"><span className="method-badge">POST</span><code>{latest.configuration.url}</code><span className="quiet-tag">Latest saved run</span></div>
       <div className="table-actions"><Button variant="outline" onClick={() => { loadConfiguration(latest.configuration); void navigate({ to: "/playground" }); }}><SlidersHorizontal />Load in Playground</Button>
         <Button asChild><Link to="/runs/$runId" params={{ runId: latest.result.id }}>Inspect run<ArrowRight /></Link></Button></div></div>
@@ -60,7 +60,7 @@ export function OverviewPage() {
       <MetricCard label="Request success" value={summary.successRate === null ? "—" : `${formatNumber(summary.successRate, 1)}%`} detail="Succeeded / started" tone="success" />
       <MetricCard label="Stopped early" value={formatNumber(summary.stoppedEarly)} detail="HTTP 500 or network error" tone={summary.stoppedEarly ? "danger" : undefined} />
     </div>
-    <section className="panel table-panel"><div className="section-heading"><div><h2>Execution log</h2><p>Recent runs saved to the master.</p></div><Button asChild variant="ghost"><Link to="/history">All history<ArrowRight /></Link></Button></div>
+    <section className="panel table-panel"><div className="section-heading"><div><h2>Execution log</h2><p>Recent runs saved to your account.</p></div><Button asChild variant="ghost"><Link to="/history">All history<ArrowRight /></Link></Button></div>
       {recentQuery.isError
         ? <div className="notice notice-error" role="status">{recentQuery.error instanceof Error ? recentQuery.error.message : "Recent runs could not be loaded."} <Button size="sm" variant="ghost" onClick={() => void recentQuery.refetch()}>Try again</Button></div>
         : recentQuery.isPending && !recentQuery.data

@@ -7,8 +7,8 @@ const AppearanceContext = createContext<{
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    try { return localStorage.getItem("do-better-theme") === "dark" ? "dark" : "light"; }
-    catch { return "light"; }
+    try { return localStorage.getItem("do-better-theme") === "light" ? "light" : "dark"; }
+    catch { return "dark"; }
   });
   const [storageWarning, setStorageWarning] = useState(false);
   useEffect(() => {

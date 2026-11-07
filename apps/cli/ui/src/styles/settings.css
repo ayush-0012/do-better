@@ -50,3 +50,13 @@
   .theme-options > button { width: 50%; }
   .detail-list { gap: 16px; }
 }
+
+.auth-header { justify-content: space-between; }
+.public-auth { max-width: 460px; margin: 64px auto; padding: clamp(20px, 5vw, 36px); }
+.public-auth h1 { margin: 8px 0 12px; font-size: clamp(24px, 4vw, 34px); font-weight: 800; letter-spacing: -.04em; }
+.public-auth > p:not(.eyebrow) { color: var(--secondary-foreground); }
+.public-auth .account-form { margin-top: 24px; }
+@media (max-width: 760px) {
+  .auth-header { padding-bottom: 12px; }
+  .public-auth { margin: 32px auto; width: calc(100% - 36px); }
+}

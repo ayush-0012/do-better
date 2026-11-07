@@ -1,5 +1,4 @@
 import { createRootRoute, createRoute, createRouter, Link, Outlet } from "@tanstack/react-router";
-import { Home } from "@/pages/home";
 import { AppShell } from "@/components/layout/app-shell";
 import { OverviewPage } from "@/pages/overview";
 import { PlaygroundPage } from "@/pages/playground";
@@ -7,7 +6,7 @@ import { HistoryPage } from "@/pages/history";
 import { RunResultsPage } from "@/pages/run-results";
 import { SettingsPage } from "@/pages/settings";
 import { SignInPage } from "@/pages/sign-in";
-import { PublicShell } from "@/components/layout/public-shell";
+import { AuthShell } from "@/components/layout/auth-shell";
 import { AccountGate } from "@/features/account/account-gate";
 
 const rootRoute = createRootRoute({
@@ -20,8 +19,8 @@ const rootRoute = createRootRoute({
   ),
 });
 
-const publicRoute = createRoute({ getParentRoute: () => rootRoute, id: "public", component: PublicShell });
-const homeRoute = createRoute({ getParentRoute: () => publicRoute, path: "/", component: Home });
+const publicRoute = createRoute({ getParentRoute: () => rootRoute, id: "account", component: AuthShell });
+const homeRoute = createRoute({ getParentRoute: () => publicRoute, path: "/", component: SignInPage });
 const signInRoute = createRoute({ getParentRoute: () => publicRoute, path: "/sign-in", component: SignInPage });
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,

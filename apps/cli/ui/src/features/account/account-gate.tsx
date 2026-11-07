@@ -22,13 +22,13 @@ export function AccountGate({ children }: { children: ReactNode }) {
     {unavailable
       ? <>
           <h1>The workspace is unavailable</h1>
-          <p>{errorMessage ?? "The master server could not be reached."}</p>
+          <p>{errorMessage ?? "The account service could not be reached."}</p>
           <Button onClick={() => void account.refetch()}>Try again</Button>
         </>
       : <>
           <LogIn size={24} aria-hidden="true" />
           <h1 role="status">Checking your account…</h1>
-          <p>Validating your saved session with the master server.</p>
+          <p>Validating your saved session.</p>
         </>}
     <Link to="/">Back to home</Link>
   </section></main>;

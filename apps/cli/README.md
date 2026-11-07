@@ -13,22 +13,20 @@ do-better start
 
 The CLI opens the UI at `http://127.0.0.1:4310`. If your browser doesn’t open, visit the URL printed in the terminal. Press **Ctrl+C** in that terminal to stop the CLI. Run `do-better --help` for command usage.
 
-## Connect the account backend
+## Sign in
 
-The CLI uses `https://do-better-production.up.railway.app` for sign-in and saved reports by default. If you’re running the backend yourself, follow the [database and server setup in the repository README](https://github.com/ayush-0012/do-better#database-setup). The backend requires PostgreSQL.
+The CLI opens a sign-in screen in your browser. Use your email and password or
+select **Create an account**. After signing in, you can open the Playground,
+Overview, History, and Settings.
 
-To use a different backend or UI port, create `do-better.config.json` in the directory where you run `do-better start`:
+To change the local UI port, create `do-better.config.json` in the directory
+where you run `do-better start`, then restart the CLI:
 
 ```json
 {
-  "port": 4310,
-  "apiUrl": "https://do-better.example.com"
+  "port": 4311
 }
 ```
-
-Replace the example URL with your backend’s origin. Use HTTPS for remote backends. HTTP is supported on loopback addresses. Supply the origin without an API path, query, or credentials. Restart the CLI after editing the file.
-
-On the landing page, choose **Sign in**. Use your email and password or select **Create an account** to register on the configured backend.
 
 ## Run your first test
 
@@ -69,7 +67,7 @@ Target requests run from your machine. Saved reports can include the target URL,
 | --- | --- |
 | `do-better: command not found` | Check that the global npm install succeeded and npm’s global executable directory is on your `PATH`. Run `npm prefix -g` to find the install prefix. |
 | Port `4310` is already in use | Stop the process using it or set another port in `do-better.config.json`. |
-| Sign-in fails or the account server is unavailable | Confirm the backend and its PostgreSQL service are running, and that `apiUrl` points to the backend origin. |
+| Sign-in fails or the account server is unavailable | Check your internet connection and try signing in again. |
 | Every request fails | Check the HTTP status distribution, then confirm that the target is reachable from your machine and that it accepts POST with the headers and body you entered. |
 
 ## Build from source

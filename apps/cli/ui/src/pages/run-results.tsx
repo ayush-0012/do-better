@@ -40,7 +40,7 @@ export function RunResultsPage({ runId }: { runId: string }) {
   }
   if (!run) {
     return <div className="page-container"><EmptyState title="Run not found"
-      description="Runs are kept in memory for this session. Sign in to open saved runs from the master."
+      description="Runs are kept in memory for this session. Sign in to open saved runs from your account."
       action={<Button asChild><Link to="/history">Back to history</Link></Button>} /></div>;
   }
 
@@ -53,14 +53,14 @@ export function RunResultsPage({ runId }: { runId: string }) {
       <Button onClick={loadInPlayground}>Run again in Playground<ArrowRight /></Button></>} />
     <div className="panel run-context"><div><div className="target-line"><span className="method-badge">POST</span><code>{configuration.url}</code></div><p className={result.stopReason === "duration_elapsed" ? "text-success" : "text-danger"}>{stopReasonLabels[result.stopReason]} · {result.elapsedSeconds}s elapsed</p></div>
       <div className="run-context-actions">
-        <span className={`quiet-tag ${isLocalRun && upload?.state === "uploaded" ? "text-success" : !isLocalRun ? "text-success" : ""}`}>{isLocalRun ? uploadLabel(upload) : "Saved to master"}</span>
+        <span className={`quiet-tag ${isLocalRun && upload?.state === "uploaded" ? "text-success" : !isLocalRun ? "text-success" : ""}`}>{isLocalRun ? uploadLabel(upload) : "Saved to account"}</span>
         {isLocalRun && upload?.state === "pending" && <Button size="sm" variant="outline" onClick={() => retryUpload.mutate()} disabled={retryUpload.isPending}>{retryUpload.isPending ? "Saving…" : "Retry save"}</Button>}
         {isLocalRun && upload?.state === "not_signed_in" && (account.data?.state === "signed_in"
           ? <Button size="sm" variant="outline" onClick={() => retryUpload.mutate()} disabled={retryUpload.isPending}>{retryUpload.isPending ? "Saving…" : "Save now"}</Button>
           : <Button size="sm" variant="outline" asChild><Link to="/settings" hash="account">Sign in to save</Link></Button>)}
       </div></div>
     {isLocalRun && upload?.state === "pending" && <div className="notice notice-error" role="status"><strong>Not saved yet.</strong> {upload.error}</div>}
-    {isLocalRun && upload?.state === "not_signed_in" && <div className="notice" role="note"><strong>Local only.</strong> {account.data?.state === "signed_in" ? "Save this run's metrics to the master server." : "Sign in from Settings to save this run's metrics to the master server."}</div>}
+    {isLocalRun && upload?.state === "not_signed_in" && <div className="notice" role="note"><strong>Local only.</strong> {account.data?.state === "signed_in" ? "Save this run's metrics to your account." : "Sign in to save this run's metrics to your account."}</div>}
     {retryUpload.error && <div className="notice notice-error" role="alert">{retryUpload.error instanceof Error ? retryUpload.error.message : "The run could not be saved."}</div>}
     {result.error && <div role="note" className="notice notice-error">{result.error}. Partial metrics are preserved in this run.</div>}
     <div className="report-grid"><div className="report-main"><RunSummary run={run} />
@@ -75,7 +75,7 @@ export function RunResultsPage({ runId }: { runId: string }) {
     </div><aside className="report-sidebar"><div className="notice"><h3>Configuration preserved</h3><p>Load this profile in the playground to prepare another run. Headers and payloads are not included in saved metadata.</p></div>
       <section className="panel report-section"><div className="section-title"><h2>Load profile</h2><span className="quiet-tag">{patternLabels[configuration.pattern]}</span></div><PatternPreview pattern={configuration.pattern} />
         <dl className="detail-list"><div><dt>Planned rate</dt><dd>{configuration.rate} req/{configuration.rateUnit === "per_second" ? "sec" : "min"}</dd></div><div><dt>Concurrency</dt><dd>{configuration.concurrency}</dd></div><div><dt>Planned duration</dt><dd>{configuration.durationSeconds} seconds</dd></div><div><dt>Stop policy</dt><dd>HTTP 500 / network error</dd></div></dl></section>
-      <section className="panel report-section privacy-panel"><LockKeyhole size={22} /><h3>Payload stays local</h3><p>Response bodies are discarded. Target headers and request bodies are never part of the master upload.</p></section>
+      <section className="panel report-section privacy-panel"><LockKeyhole size={22} /><h3>Payload stays local</h3><p>Response bodies are discarded. Target headers and request bodies are never part of your account upload.</p></section>
     </aside></div>
     <div className="execution-tray"><div className="execution-message"><SlidersHorizontal className="accent-icon" /><p>Try another rate or concurrency limit.</p></div><Button variant="outline" onClick={loadInPlayground}>Open in editor<ArrowRight /></Button></div>
   </div>;
@@ -84,7 +84,7 @@ export function RunResultsPage({ runId }: { runId: string }) {
 function uploadLabel(upload: RunUploadState | undefined) {
   switch (upload?.state) {
     case "uploaded":
-      return `Saved to master · ${shortId(upload.projectId)}`;
+      return `Saved to account · ${shortId(upload.projectId)}`;
     case "pending":
       return "Save pending";
     case "not_signed_in":

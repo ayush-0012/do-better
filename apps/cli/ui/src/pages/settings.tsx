@@ -37,10 +37,10 @@ export function SettingsPage() {
         <button aria-pressed={theme === "light"} onClick={() => setTheme("light")}><div className="theme-swatch theme-light"><span /><span /><span /></div><Sun size={17} />Warm paper</button>
         <button aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}><div className="theme-swatch theme-dark"><span /><span /><span /></div><Moon size={17} />Warm ink</button>
       </div><p className="help-text">Only your appearance preference is stored in this browser. Motion follows your operating system’s reduced-motion preference.</p>{storageWarning && <p role="status" className="field-error">Browser storage is unavailable. The theme applies now but may not survive a reload.</p>}</section>
-      <section id="local-runner" className="panel settings-section"><h2><Monitor size={21} />Local runner</h2><p>The CLI server exposes runner status and executes runs while do-better is running.</p><dl className="detail-list"><div><dt>Status</dt><dd><code>GET /api/runner</code></dd></div><div><dt>Start a run</dt><dd><code>POST /api/runs</code></dd></div><div><dt>Default address</dt><dd><code>127.0.0.1:4310</code></dd></div><div><dt>Configuration file</dt><dd><code>do-better.config.json</code></dd></div></dl><div className="command-bar"><code>{'{ "port": 4310, "apiUrl": "https://do-better-production.up.railway.app" }'}</code><CopyButton value={'{ "port": 4310, "apiUrl": "https://do-better-production.up.railway.app" }'} /></div><p className="help-text">Set the port and master API origin in the configuration file in your launch directory, then restart the CLI. The UI does not modify this file.</p></section>
-      <section id="account" className="panel settings-section"><h2><UserRound size={21} />Account</h2><p>Completed runs save to your account. Target requests still execute on this machine.</p>
+      <section id="local-runner" className="panel settings-section"><h2><Monitor size={21} />Local runner</h2><p>The local runner sends requests to the target API you configure in the Playground.</p><dl className="detail-list"><div><dt>Default address</dt><dd><code>127.0.0.1:4310</code></dd></div><div><dt>Configuration file</dt><dd><code>do-better.config.json</code></dd></div></dl><div className="command-bar"><code>{'{ "port": 4310 }'}</code><CopyButton value={'{ "port": 4310 }'} /></div><p className="help-text">To change the local UI port, update the configuration file in your launch directory and restart the CLI.</p></section>
+      <section id="account" className="panel settings-section"><h2><UserRound size={21} />Account</h2><p>Completed runs save to your account. Target requests execute on this machine.</p>
 
-        {accountState === "checking" && <p className="account-status" role="status">Checking your saved session with the master server…</p>}
+        {accountState === "checking" && <p className="account-status" role="status">Checking your saved session…</p>}
         {accountState === "unavailable" && <div className="notice notice-error" role="status"><strong>Session check failed.</strong> {account.data?.error} <Button size="sm" variant="ghost" onClick={() => void account.refetch()}>Try again</Button></div>}
 
         {isSignedIn && <div className="account-summary">
@@ -50,7 +50,6 @@ export function SettingsPage() {
 
         {isSignedIn && <dl className="detail-list account-details">
           <div><dt>Project</dt><dd>{account.data?.projectId ? <code>{shortId(account.data.projectId)}</code> : "Created after your next run"}</dd></div>
-          <div><dt>Master server</dt><dd><code>{account.data?.backendUrl}</code></dd></div>
         </dl>}
 
         {isSignedIn && <div className="account-pending">
@@ -65,7 +64,7 @@ export function SettingsPage() {
         </div>}
 
       </section>
-      <section id="privacy" className="panel settings-section"><h2><LockKeyhole size={21} />Data & privacy</h2><ul className="privacy-list"><li><strong>Requests execute locally.</strong> Target calls belong to the engine on your computer.</li><li><strong>Payloads stay local.</strong> Request headers and bodies are excluded from master uploads.</li><li><strong>Runs save automatically.</strong> When you are signed in, completed run metrics upload to the master database.</li><li><strong>Failed saves wait locally.</strong> Unsaved runs remain in <code>~/.do-better</code> for retry and are never rerun. They contain the target URL and aggregate metrics, not headers or request bodies.</li><li><strong>Response bodies are discarded.</strong> They are consumed for timing and never stored as result content.</li><li><strong>Drafts remain in memory.</strong> Reloading this page clears request payloads and headers. Your session is stored locally and checked with the master on startup.</li></ul></section>
+      <section id="privacy" className="panel settings-section"><h2><LockKeyhole size={21} />Data & privacy</h2><ul className="privacy-list"><li><strong>Requests execute locally.</strong> Target calls belong to the engine on your computer.</li><li><strong>Payloads stay local.</strong> Request headers and bodies are excluded from master uploads.</li><li><strong>Runs save automatically.</strong> When you are signed in, completed run metrics upload to your account.</li><li><strong>Failed saves wait locally.</strong> Unsaved runs remain in <code>~/.do-better</code> for retry and are never rerun. They contain the target URL and aggregate metrics, not headers or request bodies.</li><li><strong>Response bodies are discarded.</strong> They are consumed for timing and never stored as result content.</li><li><strong>Drafts remain in memory.</strong> Reloading this page clears request payloads and headers. Your session is stored locally and checked with the account service on startup.</li></ul></section>
     </div></div>
   </div>;
 }

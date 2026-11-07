@@ -337,7 +337,7 @@ export class AccountService {
       const message =
         error instanceof Error && error.name === "TimeoutError"
           ? "The master server did not respond in time."
-          : `Could not reach the master server at ${this.backendUrl}.`;
+          : "Could not reach the account service. Please try again.";
       throw new AccountError(message);
     }
 

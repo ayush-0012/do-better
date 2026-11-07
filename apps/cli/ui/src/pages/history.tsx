@@ -71,6 +71,6 @@ export function HistoryPage() {
             : <RunTable runs={runs} />}
       <div className="table-footer"><span>{total ? `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, total)} of ${total} saved runs` : hasFilters ? "No matching saved runs" : "No saved runs yet"}</span>
         <nav aria-label="History pagination" className="pagination"><Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</Button><span aria-live="polite">{currentPage} / {pageCount}</span><Button variant="outline" size="sm" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</Button></nav></div></section>
-    <aside className="notice"><strong>Your history, without the payload.</strong><p>The master stores run configuration and aggregate metrics. Target request headers and bodies are excluded.</p></aside>
+    <aside className="notice"><strong>Your history, without the payload.</strong><p>Saved reports contain run configuration and aggregate metrics. Target request headers and bodies are excluded.</p></aside>
   </div>;
 }
