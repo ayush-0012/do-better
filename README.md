@@ -41,6 +41,37 @@ bun run dev
 
 The API is running at [http://localhost:3000](http://localhost:3000).
 
+## Deploy the backend on Railway
+
+This is a shared Bun monorepo. Keep Railway's **Root Directory** at the repository
+root so the build can access `packages/auth`, `packages/db`, the shared configuration,
+and the CLI's validation schemas. Configure the backend service with these settings.
+
+| Setting | Value |
+| --- | --- |
+| Build command | `bun run build:server` |
+| Start command | `bun run start:server` |
+| Healthcheck path | `/` |
+
+Use the repository's `bun.lock` and Bun version from `packageManager` when installing
+dependencies. The root postinstall script generates the Varlock environment types.
+The build compiles the backend and bundles the shared workspace code.
+
+Set `NODE_ENV=production`, `DATABASE_URL` to your deployed PostgreSQL connection,
+`BETTER_AUTH_SECRET` to a random secret of at least 32 characters, and
+`BETTER_AUTH_URL` to the backend's public HTTPS origin. Set `CORS_ORIGIN` to the
+browser origin allowed to access the backend. For the local CLI UI using its default
+port, this is `http://127.0.0.1:4310`. OAuth provider credentials are optional for
+email/password sign-in.
+
+Railway supplies `PORT`. The server binds to that port on `0.0.0.0` and defaults
+to port 3000 locally. Configure the deployed database schema separately before
+using authentication or saved runs. Schema changes require an explicit database
+operation and are not performed by the build or start commands.
+
+Users install the CLI locally and set `apiUrl` in `do-better.config.json` to the
+deployed backend's HTTPS origin.
+
 ## Environment Configuration
 
 Each app owns its environment schema in `.env.schema`. Varlock generates `src/env.ts` during installation; run `bun run env:generate` after changing a schema. Commit schemas, and keep secrets in ignored env files or your deployment platform.
