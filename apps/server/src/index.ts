@@ -4,6 +4,6 @@ import { auth, db } from "./services";
 
 const app = createApp({ auth, db, corsOrigin: ENV.CORS_ORIGIN });
 
-app.listen(3000, () => {
-  console.log("Server is running on http://localhost:3000");
+app.listen(ENV.PORT, "0.0.0.0", () => {
+  console.log(`Server is listening on port ${ENV.PORT}`);
 });
