@@ -88,7 +88,8 @@ Run standalone Node/Bun tools that use Varlock from the owning app directory so 
 do-better/
 ├── apps/
 │   ├── cli/         # Local request engine and configuration
-│   └── server/      # Backend API (Express)
+│   ├── server/      # Backend API (Express)
+│   └── web/         # Public product website (React + Vite)
 ├── packages/
 │   ├── auth/        # Authentication configuration & logic
 │   └── db/          # Database schema & queries
@@ -96,7 +97,8 @@ do-better/
 
 ## Available Scripts
 
-- `bun run dev`: Start all applications in development mode
+- `bun run dev`: Start the public website on port 5155 and the backend
+- `bun run build:web`: Build the standalone website into `apps/web/dist`
 - `bun run build`: Build all applications
 - `bun run dev:server`: Start only the server
 - `bun run check-types`: Check TypeScript types across all apps
@@ -132,7 +134,7 @@ All four provider settings are optional for email/password authentication. A soc
 
 ### Email/password in the local UI
 
-Start the backend and CLI, choose **Sign in** on the landing page, then choose **Create an
+Start the backend and CLI, open the local sign-in screen, then choose **Create an
 account**. Enter your name, email, and a password of 8–128 characters. Account
 creation signs you in immediately. Existing users can choose **Sign in**.
 The CLI holds and persists the backend session; passwords are never saved locally.
@@ -276,7 +278,7 @@ survive locally through the retry queue described below.
 
 ### Signing in and saving runs
 
-Create an account or sign in from the landing page with email and password.
+Create an account or sign in from the local CLI sign-in screen with email and password.
 The workspace and `POST /api/runs` require a signed-in account. Social sign-in
 buttons are currently hidden. The CLI stores
 the Better Auth session cookie at `~/.do-better/session.json` (owner-only, mode
@@ -302,7 +304,7 @@ signing in, their results page offers a one-time save action.
 ### Saved run history
 
 Overview and History read the signed-in user's saved runs from the master through
-the CLI. Workspace pages send signed-out visitors back to the landing page. History
+the CLI. Workspace pages send signed-out visitors back to the local sign-in screen. History
 filters, sorting, and pagination run in the master API, so totals stay accurate
 beyond the first page. Run results open from CLI memory when available and fall
 back to the master for saved runs.
@@ -329,7 +331,7 @@ Local account, upload, and history endpoints:
 
 Run CLI and engine checks with `bun run --cwd apps/cli test`.
 
-Run `bun run --cwd apps/cli/ui dev` to preview the Stitch-based landing page,
+Run `bun run --cwd apps/cli/ui dev` to preview the local account access,
 overview, playground, history, results, and settings. The UI supports light/dark
 themes, executes runs through the local runner, and shows saved master history
 on overview and history. See [the UI README](apps/cli/ui/README.md)

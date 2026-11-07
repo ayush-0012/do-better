@@ -17,11 +17,12 @@
     },
     "apps/cli": {
       "name": "do-better-cli",
-      "dependencies": {
-        "zod": "^4.5.4",
-      },
+      "version": "0.1.1",
       "bin": {
         "do-better": "dist/index.js",
+      },
+      "dependencies": {
+        "zod": "^4.5.4",
       },
     },
     "apps/cli/ui": {
@@ -69,6 +70,22 @@
         "@types/express": "^5.0.6",
         "tsdown": "^0.23.0",
         "typescript": "catalog:",
+      },
+    },
+    "apps/web": {
+      "name": "@do-better/web",
+      "dependencies": {
+        "lucide-react": "^1.66.0",
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/node": "^26.6.6",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "@vitejs/plugin-react": "^6.1.2",
+        "typescript": "catalog:",
+        "vite": "^8.3.5",
       },
     },
     "packages/auth": {
@@ -190,12 +207,13 @@
 
     "@do-better/auth": ["@do-better/auth@workspace:packages/auth"],
 
-
     "@do-better/config": ["@do-better/config@workspace:packages/config"],
 
     "@do-better/db": ["@do-better/db@workspace:packages/db"],
 
     "@do-better/ui": ["@do-better/ui@workspace:apps/cli/ui"],
+
+    "@do-better/web": ["@do-better/web@workspace:apps/web"],
 
     "@dotenvx/dotenvx": ["@dotenvx/dotenvx@1.75.1", "", { "dependencies": { "@dotenvx/primitives": "^0.8.0", "commander": "^11.1.0", "conf": "^10.2.0", "dotenv": "^17.2.1", "enquirer": "^2.4.1", "env-paths": "^2.2.1", "execa": "^5.1.1", "fdir": "^6.2.0", "ignore": "^5.3.0", "object-treeify": "1.1.33", "open": "^8.4.2", "picomatch": "^4.0.4", "systeminformation": "^5.22.11", "undici": "^7.11.0", "which": "^4.0.0", "yocto-spinner": "^1.1.0" }, "bin": { "dotenvx": "src/cli/dotenvx.js" } }, "sha512-/BITOC9dmS/edY2zQwZNicQ059O6RKabtQfyEafV0nGtfYRNHYy1DIPiYVcov40+tob9hfmBnbR963dS+EQ1DQ=="],
 

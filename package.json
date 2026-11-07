@@ -18,10 +18,11 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@do-better/web --filter=server",
     "build": "turbo run build",
     "build:cli": "turbo run build -F do-better-cli",
     "build:server": "bun run --cwd apps/server build",
+    "build:web": "bun run --cwd apps/web build",
     "start:server": "bun run --cwd apps/server start",
     "start": "bun run start:server",
     "check-types": "turbo run check-types",
