@@ -15,7 +15,7 @@ The CLI opens the UI at `http://127.0.0.1:4310`. If your browser doesn’t open,
 
 ## Connect the account backend
 
-The CLI needs a running Do Better backend for sign-in and saved reports. It uses `http://localhost:3000` by default. If you’re running the backend yourself, follow the [database and server setup in the repository README](https://github.com/ayush-0012/do-better#database-setup). The backend requires PostgreSQL.
+The CLI uses `https://do-better-production.up.railway.app` for sign-in and saved reports by default. If you’re running the backend yourself, follow the [database and server setup in the repository README](https://github.com/ayush-0012/do-better#database-setup). The backend requires PostgreSQL.
 
 To use a different backend or UI port, create `do-better.config.json` in the directory where you run `do-better start`:
 

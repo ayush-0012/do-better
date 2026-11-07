@@ -259,10 +259,10 @@ The CLI requires Node.js 22.18 or newer. It reads optional
 `do-better.config.json` from the directory where the command is run:
 
 ```json
-{ "port": 4310, "apiUrl": "http://localhost:3000" }
+{ "port": 4310, "apiUrl": "https://do-better-production.up.railway.app" }
 ```
 
-With no file or settings, the defaults are `4310` and `http://localhost:3000`.
+With no file or settings, the defaults are `4310` and `https://do-better-production.up.railway.app`.
 `apiUrl` must be the master server origin without a path, query, or credentials;
 plain HTTP is accepted only for loopback hosts, and other hosts require HTTPS.
 There is no command-line port option. Invalid configuration or an occupied port
