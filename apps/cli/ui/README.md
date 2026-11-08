@@ -9,7 +9,6 @@ From the repository root:
 ```sh
 bun run --cwd apps/cli/ui dev
 bun run --cwd apps/cli/ui check-types
-bun run --cwd apps/cli/ui test
 bun run --cwd apps/cli/ui build
 ```
 

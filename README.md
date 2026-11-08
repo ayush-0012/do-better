@@ -146,24 +146,18 @@ The versioned owner-login migration removes the old account/verification tables 
 
 Passwords, password hashes, and session hashes never appear in these responses. Existing CLI session files from Better Auth expire on their next check; sign in again with the newly configured owner.
 
-### Automated checks
+### Verification
 
-Engine checks run without a database or network access:
+Run type checks and builds for the affected packages:
 
 ```sh
-bun run --cwd apps/cli test:engine
+bun run --cwd apps/server check-types
+bun run --cwd apps/server build
+bun run --cwd apps/cli check-types
+bun run --cwd apps/cli build
+bun run --cwd apps/cli/ui check-types
+bun run --cwd apps/cli/ui build
 ```
-
-Session and result-upload checks each use an isolated in-memory SQLite database with the committed migrations applied. From the repository root:
-
-```bash
-bun run --cwd apps/server test:auth
-bun run --cwd apps/server test:results
-bun run --cwd apps/server test:saved-runs
-```
-
-These checks use real localhost HTTP endpoints and SQLite to verify sessions, refresh, logout, project ownership, metrics storage, failed writes, and concurrent upload retries. Closing each in-memory database discards its generated records. Application environment files and a separate database service are not needed.
-
 
 ## Local test runs and master storage
 
@@ -266,8 +260,6 @@ Local account, upload, and history endpoints:
 | `GET /api/saved-runs` | Proxy saved runs with `limit`, `offset`, `search`, `outcome`, and `sort` |
 | `GET /api/saved-runs/summary` | Proxy aggregate history metrics and the latest run |
 | `GET /api/saved-runs/:id` | Proxy one saved run owned by the signed-in user |
-
-Run CLI and engine checks with `bun run --cwd apps/cli test`.
 
 Run `bun run --cwd apps/cli/ui dev` to preview the local account access,
 overview, playground, history, results, and settings. The UI supports light/dark
