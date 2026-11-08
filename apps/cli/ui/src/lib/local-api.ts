@@ -17,8 +17,7 @@ export interface LocalApiIssue {
 
 export interface AccountUser {
   id: string;
-  name?: string;
-  email?: string;
+  username: string;
 }
 
 export interface AccountSnapshot {
@@ -134,23 +133,23 @@ export async function getAccount(): Promise<AccountSnapshot> {
   return readJson<AccountSnapshot>(await request("/api/account"));
 }
 
-export async function signIn(email: string, password: string) {
+export async function signIn(username: string, password: string) {
   const payload = await readJson<{ account: AccountSnapshot; retry: RetrySummary }>(
     await request("/api/account/sign-in", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     }),
   );
   return payload;
 }
 
-export async function signUp(name: string, email: string, password: string) {
+export async function setupOwner(username: string, password: string) {
   return readJson<{ account: AccountSnapshot; retry: RetrySummary }>(
-    await request("/api/account/sign-up", {
+    await request("/api/account/setup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ username, password }),
     }),
   );
 }
@@ -161,14 +160,8 @@ export async function signOut() {
   );
 }
 
-export async function startOAuth(provider: "google" | "github") {
-  return readJson<{ started: boolean; provider: string }>(
-    await request("/api/account/oauth/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider }),
-    }),
-  );
+export async function getSetupStatus() {
+  return readJson<{ setupRequired: boolean }>(await request("/api/account/setup"));
 }
 
 export async function getPendingUploads(): Promise<PendingUploadSummary> {

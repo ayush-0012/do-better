@@ -20,7 +20,7 @@ export function AppShell() {
   const runnerDot = runnerState === "running" ? "status-running" : runnerState === "idle" ? "status-idle" : "status-unavailable";
   const accountState = account.data?.state;
   const accountLabel = accountState === "signed_in"
-    ? account.data?.user?.name || account.data?.user?.email || "Account"
+    ? account.data?.user?.username || "Account"
     : accountState === "unavailable" ? "Account offline" : accountState === "checking" ? "Checking account" : "Sign in";
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Skip to content</a>
@@ -36,6 +36,6 @@ export function AppShell() {
       </div>
     </div></header>
     <main id="main-content" tabIndex={-1}><Outlet /></main>
-    <footer className="app-footer"><span><strong>do-better</strong> <span className="footer-dot">·</span> Built for local API testing</span><span>Configure. Run. Understand.</span></footer>
+    <footer className="app-footer"><span><strong>Do Better</strong> <span className="footer-dot">·</span> Built for local API testing</span><span>Configure. Run. Understand.</span></footer>
   </div>;
 }

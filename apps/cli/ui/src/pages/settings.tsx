@@ -44,7 +44,7 @@ export function SettingsPage() {
         {accountState === "unavailable" && <div className="notice notice-error" role="status"><strong>Session check failed.</strong> {account.data?.error} <Button size="sm" variant="ghost" onClick={() => void account.refetch()}>Try again</Button></div>}
 
         {isSignedIn && <div className="account-summary">
-          <div className="account-identity"><strong>{user?.name || user?.email || "Signed in"}</strong><span>{user?.email}</span></div>
+          <div className="account-identity"><strong>{user?.username || "Signed in"}</strong><span>{user?.username}</span></div>
           <span className="quiet-tag text-success">Signed in</span>
         </div>}
 

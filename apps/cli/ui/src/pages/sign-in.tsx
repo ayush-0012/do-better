@@ -1,51 +1,55 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { useAccount, useSignIn, useSignUp } from "@/features/account/use-account";
+import { useAccount, useSetupOwner, useSetupStatus, useSignIn } from "@/features/account/use-account";
 
 export function SignInPage() {
   const account = useAccount();
+  const setupStatus = useSetupStatus(account.data?.state === "signed_out");
   const signIn = useSignIn();
-  const signUp = useSignUp();
-  const [email, setEmail] = useState("");
+  const setup = useSetupOwner();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
-  const [name, setName] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [confirmationError, setConfirmationError] = useState("");
+  const isSetup = setupStatus.data?.setupRequired === true;
+  const pending = signIn.isPending || setup.isPending;
+  const error = setup.error ?? signIn.error;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (isCreatingAccount) {
-      signUp.mutate({ name, email, password }, { onSuccess: () => setPassword("") });
-    } else {
-      signIn.mutate({ email, password }, { onSuccess: () => setPassword("") });
+    if (pending || !setupStatus.isSuccess) return;
+    if (isSetup && password !== confirmation) {
+      setConfirmationError("Passwords do not match.");
+      return;
     }
+    setConfirmationError("");
+    const mutation = isSetup ? setup : signIn;
+    mutation.mutate({ username, password }, { onSuccess: () => { setPassword(""); setConfirmation(""); } });
   }
 
-  const authPending = signIn.isPending || signUp.isPending;
-  const authError = isCreatingAccount ? signUp.error : signIn.error;
   if (account.data?.state === "signed_in") return <Navigate to="/overview" replace />;
+  const checking = account.isPending || account.data?.state === "checking" || (account.data?.state === "signed_out" && setupStatus.isPending);
+  const unavailable = account.isError || account.data?.state === "unavailable" || setupStatus.isError;
 
-  const checking = account.isPending || account.data?.state === "checking";
   return <section className="public-auth panel" aria-labelledby="sign-in-title">
     <p className="eyebrow">Your workspace</p>
-    <h1 id="sign-in-title">{isCreatingAccount ? "Create an account" : "Sign in to do-better"}</h1>
-    <p>Sign in to run tests on this machine and access your saved reports.</p>
-    {checking ? <p role="status">Checking your saved session…</p> : <>
-      {account.data?.state === "unavailable" && <p className="field-error" role="status">{account.data.error}</p>}
-      <form className="account-form" onSubmit={submit}>
-        {isCreatingAccount && <label className="field">Name<input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required disabled={authPending} /></label>}
-        <label className="field">Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={320} required disabled={authPending} /></label>
-        <label className="field">Password<input type="password" autoComplete={isCreatingAccount ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={isCreatingAccount ? 8 : undefined} maxLength={isCreatingAccount ? 128 : 1024} required disabled={authPending} aria-describedby={isCreatingAccount ? "account-password-help" : undefined} /></label>
-        {isCreatingAccount && <p id="account-password-help" className="help-text">Use 8–128 characters. Email verification and password recovery are not available yet.</p>}
-        {authError && <p className="field-error" role="alert">{authError instanceof Error ? authError.message : "Could not complete authentication. Try again."}</p>}
-        <Button type="submit" disabled={authPending}>{authPending ? (isCreatingAccount ? "Creating account…" : "Signing in…") : (isCreatingAccount ? "Create account" : "Sign in")}</Button>
-        <Button type="button" variant="ghost" disabled={authPending} onClick={() => {
-          setIsCreatingAccount(!isCreatingAccount);
-          setPassword("");
-          signIn.reset();
-          signUp.reset();
-        }}>{isCreatingAccount ? "Already have an account? Sign in" : "New here? Create an account"}</Button>
-      </form>
-    </>}
+    <h1 id="sign-in-title">{isSetup ? "Set up your workspace" : "Sign in to do-better"}</h1>
+    <p>{isSetup ? "Choose the owner's username and password. This installation supports one owner." : "Sign in to run tests on this machine and access your saved reports."}</p>
+    {checking ? <p role="status">Checking your workspace…</p> : unavailable ? <>
+      <p className="field-error" role="alert">{account.data?.error ?? "Could not reach the master server. Check the connection and try again."}</p>
+      <Button variant="outline" onClick={() => { void account.refetch(); void setupStatus.refetch(); }}>Try again</Button>
+    </> : <form className="account-form" onSubmit={submit}>
+      <label className="field">Username<input autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} maxLength={64} pattern="[a-zA-Z0-9_.\-]+" required disabled={pending} aria-describedby={isSetup ? "username-help" : undefined} /></label>
+      {isSetup && <p id="username-help" className="help-text">Use letters, numbers, dots, underscores, or hyphens.</p>}
+      <label className="field">Password<input type="password" autoComplete={isSetup ? "new-password" : "current-password"} value={password} onChange={(event) => { setPassword(event.target.value); setConfirmationError(""); }} minLength={8} maxLength={128} required disabled={pending} aria-describedby={isSetup ? "password-help" : undefined} /></label>
+      {isSetup && <>
+        <p id="password-help" className="help-text">Use 8–128 characters. Keep this password safe; password recovery is not available.</p>
+        <label className="field">Confirm password<input type="password" autoComplete="new-password" value={confirmation} onChange={(event) => { setConfirmation(event.target.value); setConfirmationError(""); }} minLength={8} maxLength={128} required disabled={pending} aria-invalid={Boolean(confirmationError)} aria-describedby={confirmationError ? "confirmation-error" : undefined} /></label>
+      </>}
+      {confirmationError && <p id="confirmation-error" className="field-error" role="alert">{confirmationError}</p>}
+      {error && <p className="field-error" role="alert">{error instanceof Error ? error.message : "Could not sign in. Try again."}</p>}
+      <Button type="submit" disabled={pending || !setupStatus.isSuccess}>{pending ? (isSetup ? "Setting up…" : "Signing in…") : (isSetup ? "Create owner account" : "Sign in")}</Button>
+    </form>}
   </section>;
 }

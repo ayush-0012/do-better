@@ -9,17 +9,16 @@ import {
   runQueryKey,
   savedRunsRootQueryKey,
   signIn,
-  signUp,
+  setupOwner,
+  getSetupStatus,
   signOut,
-  startOAuth,
 } from "@/lib/local-api";
 
-export function useAccount(pollForOAuth = false) {
+export function useAccount() {
   return useQuery({
     queryKey: accountQueryKey,
     queryFn: getAccount,
     refetchInterval: (query) => {
-      if (pollForOAuth) return query.state.data?.state === "signed_in" ? false : 2000;
       return query.state.data?.state === "checking" ? 1000 : false;
     },
     refetchOnWindowFocus: true,
@@ -37,21 +36,24 @@ export function usePendingUploads() {
 export function useSignIn() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) => signIn(email, password),
+    mutationFn: ({ username, password }: { username: string; password: string }) => signIn(username, password),
     onSuccess: ({ account }) => {
       queryClient.setQueryData(accountQueryKey, account);
+      void queryClient.invalidateQueries({ queryKey: ["owner-setup"] });
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
       void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }
 
-export function useSignUp() {
+export function useSetupOwner() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, email, password }: { name: string; email: string; password: string }) => signUp(name, email, password),
+    mutationFn: ({ username, password }: { username: string; password: string }) => setupOwner(username, password),
+    onError: () => { void queryClient.invalidateQueries({ queryKey: ["owner-setup"] }); },
     onSuccess: ({ account }) => {
       queryClient.setQueryData(accountQueryKey, account);
+      void queryClient.invalidateQueries({ queryKey: ["owner-setup"] });
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
       void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
@@ -64,20 +66,15 @@ export function useSignOut() {
     mutationFn: signOut,
     onSuccess: ({ account }) => {
       queryClient.setQueryData(accountQueryKey, account);
+      void queryClient.invalidateQueries({ queryKey: ["owner-setup"] });
       void queryClient.invalidateQueries({ queryKey: pendingUploadsQueryKey });
       void queryClient.invalidateQueries({ queryKey: savedRunsRootQueryKey });
     },
   });
 }
 
-export function useStartOAuth() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (provider: "google" | "github") => startOAuth(provider),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: accountQueryKey });
-    },
-  });
+export function useSetupStatus(enabled: boolean) {
+  return useQuery({ queryKey: ["owner-setup"], queryFn: getSetupStatus, enabled, refetchOnWindowFocus: true });
 }
 
 export function useRetryPendingUploads() {
