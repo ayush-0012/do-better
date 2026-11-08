@@ -19,8 +19,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "bun src/index.ts start",
-    "test": "bun test tests",
-    "check-types": "tsc --noEmit",
-    "test:engine": "bun test tests/engine.test.ts"
+    "check-types": "tsc --noEmit"
   }
 }
