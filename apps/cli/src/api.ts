@@ -124,26 +124,22 @@ async function route(
     requireMethod(req, "POST");
     requireOrigin(req, expectedOrigin);
     const payload = await readJsonPayload(req);
-    const { email, password } = readSignInPayload(payload);
-    const accountState = await account.signIn(email, password);
+    const { username, password } = readSignInPayload(payload);
+    const accountState = await account.signIn(username, password);
     const retry = await uploads.retryPending();
     sendJson(res, 200, { account: await accountSnapshot(account, uploads), retry, state: accountState.state });
     return;
   }
 
-  if (url.pathname === "/api/account/sign-up") {
+  if (url.pathname === "/api/account/setup") {
+    if (req.method === "GET") {
+      sendJson(res, 200, await account.getSetupStatus());
+      return;
+    }
     requireMethod(req, "POST");
     requireOrigin(req, expectedOrigin);
-    const payload = await readJsonPayload(req);
-    const { email, password } = readSignInPayload(payload);
-    const name = (payload as { name?: unknown }).name;
-    if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
-      throw new ApiError(400, "Enter a name of up to 100 characters.");
-    }
-    if (password.length < 8 || password.length > 128) {
-      throw new ApiError(400, "Use a password between 8 and 128 characters.");
-    }
-    await account.signUp(name.trim(), email, password);
+    const { username, password } = readSignInPayload(await readJsonPayload(req));
+    await account.setup(username, password);
     const retry = await uploads.retryPending();
     sendJson(res, 200, { account: await accountSnapshot(account, uploads), retry });
     return;
@@ -154,22 +150,6 @@ async function route(
     requireOrigin(req, expectedOrigin);
     const result = await account.signOut();
     sendJson(res, 200, { account: await accountSnapshot(account, uploads), ...result });
-    return;
-  }
-
-  if (url.pathname === "/api/account/oauth/start") {
-    requireMethod(req, "POST");
-    requireOrigin(req, expectedOrigin);
-    const payload = await readJsonPayload(req);
-    const provider = readProvider(payload);
-    await account.startOAuth(provider);
-    sendJson(res, 200, { started: true, provider });
-    return;
-  }
-
-  if (url.pathname === "/api/account/oauth/complete") {
-    requireMethod(req, "GET");
-    await completeOAuth(res, url, account, uploads);
     return;
   }
 
@@ -210,30 +190,6 @@ async function route(
   throw new ApiError(404, "Not found.");
 }
 
-async function completeOAuth(
-  res: ServerResponse,
-  url: URL,
-  account: AccountService,
-  uploads: UploadService,
-) {
-  const token = url.searchParams.get("token");
-  const state = url.searchParams.get("state");
-  if (!token || !state) {
-    sendHtml(res, 400, messagePage("Sign-in link is incomplete", "Return to the app and start sign-in again."));
-    return;
-  }
-
-  try {
-    await account.completeOAuth(token, state);
-    await uploads.retryPending();
-    res.writeHead(303, { Location: "/settings#account", "Cache-Control": "no-store" });
-    res.end();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Sign-in could not be completed.";
-    sendHtml(res, 400, messagePage("Sign-in could not be completed", message));
-  }
-}
-
 async function accountSnapshot(account: AccountService, uploads: UploadService) {
   const status = account.getStatus();
   if (status.state !== "signed_in") return { ...status, projectId: null };
@@ -243,27 +199,16 @@ async function accountSnapshot(account: AccountService, uploads: UploadService) 
 
 function readSignInPayload(payload: unknown) {
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new ApiError(400, "Send an email and password.");
+    throw new ApiError(400, "Send a username and password.");
   }
-  const { email, password } = payload as { email?: unknown; password?: unknown };
-  if (typeof email !== "string" || !email.trim() || email.length > 320) {
-    throw new ApiError(400, "Enter a valid email address.");
+  const { username, password } = payload as { username?: unknown; password?: unknown };
+  if (typeof username !== "string" || !/^[a-zA-Z0-9_.-]{1,64}$/.test(username.trim())) {
+    throw new ApiError(400, "Use a username of 1–64 letters, numbers, dots, underscores, or hyphens.");
   }
-  if (typeof password !== "string" || !password || password.length > 1024) {
-    throw new ApiError(400, "Enter your password.");
+  if (typeof password !== "string" || password.length < 8 || password.length > 128) {
+    throw new ApiError(400, "Use a password between 8 and 128 characters.");
   }
-  return { email: email.trim(), password };
-}
-
-function readProvider(payload: unknown) {
-  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new ApiError(400, "Choose a sign-in provider.");
-  }
-  const provider = (payload as { provider?: unknown }).provider;
-  if (provider !== "google" && provider !== "github") {
-    throw new ApiError(400, "Choose Google or GitHub to sign in.");
-  }
-  return provider;
+  return { username: username.trim(), password };
 }
 
 async function readJsonPayload(req: IncomingMessage) {
@@ -349,27 +294,4 @@ function sendJson(res: ServerResponse, status: number, payload: unknown) {
     "Cache-Control": "no-store",
   });
   res.end(body);
-}
-
-function sendHtml(res: ServerResponse, status: number, html: string) {
-  const body = Buffer.from(html);
-  res.writeHead(status, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Content-Length": body.byteLength,
-    "Cache-Control": "no-store",
-  });
-  res.end(body);
-}
-
-function messagePage(title: string, message: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title></head><body style="font-family:system-ui,sans-serif;max-width:560px;margin:12vh auto;padding:24px;line-height:1.5"><h1 style="font-size:24px">${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p><p><a href="/settings#account">Back to settings</a></p></body></html>`;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }

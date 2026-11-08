@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import {
   readJsonFile,
@@ -9,13 +8,10 @@ import {
 
 const SESSION_FILENAME = "session.json";
 const REQUEST_TIMEOUT_MS = 5_000;
-const OAUTH_STATE_TTL_MS = 10 * 60_000;
-const OAUTH_STATES = new Set(["google", "github"]);
 
 export interface AccountUser {
   id: string;
-  name?: string;
-  email?: string;
+  username: string;
 }
 
 export type AccountStatus =
@@ -41,7 +37,6 @@ interface JsonRequestInit extends Omit<RequestInit, "body"> {
 export interface AccountServiceOptions {
   backendUrl: string;
   stateDirectory?: string;
-  launchBrowser: (url: string) => Promise<void>;
   fetch?: typeof fetch;
   timeoutMs?: number;
 }
@@ -54,11 +49,9 @@ interface StoredSession {
 export class AccountService {
   private readonly backendUrl: string;
   private readonly sessionPath: string;
-  private readonly launchBrowser: (url: string) => Promise<void>;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
   private readonly cookies = new Map<string, string>();
-  private readonly pendingOAuthStates = new Map<string, number>();
   private status: AccountStatus;
   private initialization: Promise<void> | null = null;
 
@@ -68,7 +61,6 @@ export class AccountService {
       resolveStateDirectory(options.stateDirectory),
       SESSION_FILENAME,
     );
-    this.launchBrowser = options.launchBrowser;
     this.fetchImpl = options.fetch ?? fetch;
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
     this.status = { state: "checking", backendUrl: this.backendUrl };
@@ -87,22 +79,26 @@ export class AccountService {
     return this.backendUrl;
   }
 
-  async signIn(email: string, password: string) {
-    return this.authenticateEmail("sign-in", { email, password });
+  async getSetupStatus(): Promise<{ setupRequired: boolean }> {
+    const response = await this.request("/api/auth/setup");
+    const payload = await readResponse<{ setupRequired?: unknown }>(response);
+    if (typeof payload?.setupRequired !== "boolean") throw new AccountError("The master server returned an invalid setup status.", 502);
+    return { setupRequired: payload.setupRequired };
   }
 
-  async signUp(name: string, email: string, password: string) {
-    return this.authenticateEmail("sign-up", { name, email, password });
+  async signIn(username: string, password: string) {
+    return this.authenticate("sign-in", { username, password });
   }
 
-  private async authenticateEmail(action: "sign-in" | "sign-up", credentials: { name?: string; email: string; password: string }) {
-    const response = await this.request(`/api/auth/${action}/email`, {
-      method: "POST",
-      body: credentials,
-    });
+  async setup(username: string, password: string) {
+    return this.authenticate("setup", { username, password });
+  }
+
+  private async authenticate(action: "sign-in" | "setup", credentials: { username: string; password: string }) {
+    const response = await this.request(`/api/auth/${action}`, { method: "POST", body: credentials });
     const payload = await readResponse<{ user?: unknown }>(response);
     const startedSession = this.captureCookies(response.headers);
-    const user = toAccountUser(payload.user);
+    const user = toAccountUser(payload?.user);
     if (!user || !startedSession) {
       throw new AccountError("The master server did not start a session.", 502);
     }
@@ -133,72 +129,6 @@ export class AccountService {
     return warning ? { warning } : {};
   }
 
-  async startOAuth(provider: string): Promise<{ provider: string }> {
-    if (!OAUTH_STATES.has(provider)) {
-      throw new AccountError("Choose Google or GitHub to sign in.", 400);
-    }
-
-    this.pruneOAuthStates();
-    if (!this.localPortValue) {
-      throw new AccountError("The local server is not ready for browser sign-in.", 500);
-    }
-    const state = randomBytes(32).toString("base64url");
-    this.pendingOAuthStates.set(state, Date.now() + OAUTH_STATE_TTL_MS);
-
-    let url: string;
-    try {
-      const response = await this.request("/api/auth/sign-in/social", {
-        method: "POST",
-        body: {
-          provider,
-          callbackURL: `/api/desktop/handoff?port=${this.localPortValue}&state=${state}`,
-          disableRedirect: true,
-        },
-      });
-      const payload = await readResponse<{ url?: unknown }>(response);
-      if (typeof payload.url !== "string" || !payload.url) {
-        throw new AccountError("The master server did not return a sign-in URL.", 502);
-      }
-      url = payload.url;
-    } catch (error) {
-      this.pendingOAuthStates.delete(state);
-      throw error;
-    }
-
-    try {
-      await this.launchBrowser(url);
-    } catch (error) {
-      this.pendingOAuthStates.delete(state);
-      throw new AccountError(
-        `Could not open the browser: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-    return { provider };
-  }
-
-  async completeOAuth(token: string, state: string) {
-    this.pruneOAuthStates();
-    if (!this.pendingOAuthStates.has(state)) {
-      throw new AccountError("This sign-in link is invalid or has expired.", 400);
-    }
-    this.pendingOAuthStates.delete(state);
-
-    const response = await this.request("/api/auth/one-time-token/verify", {
-      method: "POST",
-      body: { token },
-    });
-    const payload = await readResponse<{ user?: unknown }>(response);
-    const startedSession = this.captureCookies(response.headers);
-    const user = toAccountUser(payload.user);
-    if (!user || !startedSession) {
-      throw new AccountError("The master server did not start a session.", 502);
-    }
-    this.status = { state: "signed_in", backendUrl: this.backendUrl, user };
-    await this.persistSession();
-    void this.refreshSession();
-    return this.getStatus();
-  }
-
   /**
    * Sends an authenticated request to the master. Callers must check the
    * account state first; a missing session is treated as an authentication
@@ -213,17 +143,11 @@ export class AccountService {
     return response;
   }
 
-  invalidate() {
+  async invalidate() {
     this.cookies.clear();
     this.status = { state: "signed_out", backendUrl: this.backendUrl };
-    return removeJsonFile(this.sessionPath).catch(() => undefined);
+    await removeJsonFile(this.sessionPath);
   }
-
-  setLocalPort(port: number) {
-    this.localPortValue = port;
-  }
-
-  private localPortValue: number | null = null;
 
   private async loadSavedSession() {
     let stored: unknown;
@@ -305,7 +229,7 @@ export class AccountService {
       return this.status;
     }
     this.captureCookies(response.headers);
-    const user = toAccountUser(payload.user);
+    const user = toAccountUser(payload?.user);
     if (!user) {
       await this.invalidate();
       return this.status;
@@ -342,12 +266,19 @@ export class AccountService {
     }
 
     if (!response.ok) {
-      const payload = await readResponse<{ message?: unknown; error?: unknown }>(response);
+      // Error bodies may be null, HTML, or empty (for example, an older master
+      // returns 404/null for owner setup). Keep the original HTTP status.
+      const payload: unknown = await response.json().catch(() => null);
+      const details = payload !== null && typeof payload === "object" && !Array.isArray(payload)
+        ? payload as { message?: unknown; error?: unknown }
+        : undefined;
       const message =
-        typeof payload.message === "string"
-          ? payload.message
-          : typeof payload.error === "string"
-            ? payload.error
+        path === "/api/auth/setup" && response.status === 404
+          ? `The master server at ${this.backendUrl} does not support owner setup. Set apiUrl to the updated master server.`
+          : typeof details?.message === "string"
+            ? details.message
+            : typeof details?.error === "string"
+              ? details.error
             : `The master server returned HTTP ${response.status}.`;
       throw new AccountError(message, response.status);
     }
@@ -390,12 +321,7 @@ export class AccountService {
     await writeJsonFile(this.sessionPath, stored);
   }
 
-  private pruneOAuthStates() {
-    const now = Date.now();
-    for (const [state, expiresAt] of this.pendingOAuthStates) {
-      if (expiresAt <= now) this.pendingOAuthStates.delete(state);
-    }
-  }
+
 }
 
 function isStoredSession(value: unknown): value is StoredSession {
@@ -411,12 +337,11 @@ function isStoredSession(value: unknown): value is StoredSession {
 
 function toAccountUser(value: unknown): AccountUser | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-  const user = value as { id?: unknown; name?: unknown; email?: unknown };
-  if (typeof user.id !== "string" || !user.id) return null;
+  const user = value as { id?: unknown; username?: unknown };
+  if (typeof user.id !== "string" || !user.id || typeof user.username !== "string" || !user.username) return null;
   return {
     id: user.id,
-    ...(typeof user.name === "string" ? { name: user.name } : {}),
-    ...(typeof user.email === "string" ? { email: user.email } : {}),
+    username: user.username,
   };
 }
 

@@ -8,7 +8,6 @@ import {
 import { join, resolve } from "node:path";
 import { AccountService } from "./account.ts";
 import { handleLocalApi } from "./api.ts";
-import { openBrowser } from "./browser.ts";
 import { DEFAULT_API_URL } from "./config.ts";
 import {
   contentTypeFor,
@@ -41,7 +40,6 @@ export interface LocalServerOptions {
   apiUrl?: string;
   /** Overrides ~/.do-better for tests or custom installs. */
   stateDirectory?: string;
-  launchBrowser?: (url: string) => Promise<void>;
   /** Tests can skip waiting for the saved session check. */
   awaitSessionCheck?: boolean;
 }
@@ -56,7 +54,6 @@ export async function startLocalServer(
   const account = new AccountService({
     backendUrl: options.apiUrl ?? DEFAULT_API_URL,
     stateDirectory: options.stateDirectory,
-    launchBrowser: options.launchBrowser ?? openBrowser,
   });
   const uploads = new UploadService({
     account,
@@ -85,9 +82,6 @@ export async function startLocalServer(
     });
   });
 
-  const address = server.address();
-  if (typeof address === "object" && address)
-    account.setLocalPort(address.port);
   if (options.awaitSessionCheck !== false) {
     await Promise.all([account.initialize(), uploads.initialize()]);
     if (account.getStatus().state === "signed_in") void uploads.retryPending();

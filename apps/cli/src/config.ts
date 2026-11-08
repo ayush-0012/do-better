@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export const DEFAULT_PORT = 4310;
-export const DEFAULT_API_URL = "https://do-better-production.up.railway.app";
+export const DEFAULT_API_URL = "http://localhost:47381";
 export const CONFIG_FILENAME = "do-better.config.json";
 
 export interface CliConfig {
