@@ -9,7 +9,7 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **Bun** - Runtime environment
 - **Drizzle** - TypeScript-first ORM
 - **SQLite** - Embedded database engine
-- **Authentication** - Better-Auth
+- **Authentication** - Single-owner username/password login
 - **Turborepo** - Optimized monorepo build system
 
 ## Getting Started
@@ -45,7 +45,7 @@ Then, run the development server:
 bun run dev
 ```
 
-The API is running at [http://localhost:3000](http://localhost:3000).
+The API is running at [http://localhost:47381](http://localhost:47381).
 
 ## Deploy the backend on Railway
 
@@ -64,19 +64,17 @@ dependencies. The root postinstall script generates the Varlock environment type
 The build compiles the backend and bundles the shared workspace code.
 
 Set `NODE_ENV=production`, `DATABASE_URL` to a SQLite path on persistent local storage (for example `/data/do-better.sqlite`),
-`BETTER_AUTH_SECRET` to a random secret of at least 32 characters, and
-`BETTER_AUTH_URL` to the backend's public HTTPS origin. Set `CORS_ORIGIN` to the
+`SERVER_ORIGIN` to the backend's public HTTPS origin. Set `CORS_ORIGIN` to the
 browser origin allowed to access the backend. For the local CLI UI using its default
-port, this is `http://127.0.0.1:4310`. OAuth provider credentials are optional for
-email/password sign-in.
+port, this is `http://127.0.0.1:4310`. Set up the owner through the UI before exposing an unconfigured server publicly.
 
 Railway supplies `PORT`. The server binds to that port on `0.0.0.0` and defaults
-to port 3000 locally. Configure the deployed database schema separately before
+to port 47381 locally. Configure the deployed database schema separately before
 using authentication or saved runs. Schema changes require an explicit database
 operation and are not performed by the build or start commands.
 
-Users install the CLI locally and set `apiUrl` in `do-better.config.json` to the
-deployed backend's HTTPS origin.
+The CLI defaults to the local master at `http://localhost:47381` in every environment.
+To use a master at another address, set `apiUrl` in `do-better.config.json`.
 
 ## Environment Configuration
 
@@ -113,101 +111,40 @@ do-better/
 - `bun run db:migrate`: Run database migrations
 - `bun run db:studio`: Open database studio UI
 
-## Better Auth Schema Generation
+## Owner setup and login
 
-After changing auth plugins or schema options, run `bun run auth:generate` from the project root. The script runs the Better Auth CLI through `varlock run` from the owning app directory, loading the auth instance from `src/services.ts`. Review the schema changes, then use your ORM's migration workflow to apply them.
+The installation has one owner. On first opening the CLI UI, create a username and password, confirm the password, and enter the workspace. After setup, that form becomes a sign-in form; there is no public signup, email login, or OAuth flow.
 
-## Authentication
+**Complete setup before exposing the server publicly.** The first successful setup request claims the installation. Keep it private or use an SSH tunnel until the owner is configured. Setup runs in an immediate SQLite transaction, so concurrent requests cannot create two owners.
 
-The backend supports email/password, Google, and GitHub through Better Auth. All three use SQLite-backed sessions. The existing `user`, `account`, `session`, and `verification` tables support these methods without a schema change.
+Usernames are case-sensitive and contain 1–64 ASCII letters, numbers, dots, underscores, or hyphens. Passwords must contain 8–128 characters. The server stores only an Argon2id password hash in `user.password_hash`, never the plaintext password. Password recovery and credential changes are not implemented.
+
+Sessions live in the `session` table with SHA-256 hashes of random 256-bit tokens. The raw token is sent in an HttpOnly, SameSite=Lax cookie and is persisted by the local CLI in its owner-only session file. Cookies also use Secure in production. Sessions last seven days and refresh after a day of activity; logout revokes the current session. Credential hashing endpoints allow ten attempts per minute per server process; this limit resets on restart. Mutating requests reject untrusted browser origins.
 
 ### Server configuration
-
-Set these values in the server's ignored `apps/server/.env` file or deployment environment:
 
 | Variable | Value |
 | --- | --- |
 | `DATABASE_URL` | SQLite file path, relative to `apps/server` or absolute |
-| `BETTER_AUTH_SECRET` | A random secret of at least 32 characters; generate one with `openssl rand -base64 32` |
-| `BETTER_AUTH_URL` | Public backend origin, such as `http://localhost:3000` for development |
-| `CORS_ORIGIN` | The explicitly allowed frontend origin; use `http://localhost:3000` for the backend-only examples below |
-| `GOOGLE_CLIENT_ID` | Google OAuth web application's client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth web application's client secret |
-| `GITHUB_CLIENT_ID` | GitHub OAuth application's client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth application's client secret |
+| `SERVER_ORIGIN` | Backend origin used by the CLI, such as `http://localhost:47381`; use the public HTTPS origin in production |
+| `CORS_ORIGIN` | Browser origin allowed to access the backend |
 
-All four provider settings are optional for email/password authentication. A social provider is enabled on the backend only when both its client ID and secret are set. The current UI offers email/password only; Google/GitHub UI sign-in is deferred. Keep OAuth secrets on the backend; do not include them in UI assets, the CLI package, or committed files. Run `bun run env:generate` from `apps/server` after editing its environment schema. The generated `src/env.ts` remains managed by Varlock.
+No Better Auth secrets or OAuth credentials are needed. Existing unused keys in local env files can be removed. Run `bun run env:generate` after editing an environment schema.
 
-### Email/password in the local UI
+The versioned owner-login migration removes the old account/verification tables and replaces the user/session layouts. It deliberately **refuses populated legacy auth tables**: existing identities require a separately planned conversion rather than silently dropping credentials or ownership. The current local database was empty when migrated. Apply committed migrations with `bun run --cwd packages/db db:migrate`.
 
-Start the backend and CLI, open the local sign-in screen, then choose **Create an
-account**. Enter your name, email, and a password of 8–128 characters. Account
-creation signs you in immediately. Existing users can choose **Sign in**.
-The CLI holds and persists the backend session; passwords are never saved locally.
-No Google/GitHub credentials are needed. Email verification delivery and password
-recovery remain deferred until an email delivery service is configured.
+### Master login endpoints
 
-### OAuth application registration
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /api/auth/setup` | Returns `{ "setupRequired": true/false }` |
+| `POST /api/auth/setup` | Creates the only owner and signs in; accepts `{ "username", "password" }`; returns 409 after setup |
+| `POST /api/auth/sign-in` | Verifies username/password and starts a session |
+| `GET /api/auth/get-session` | Returns `{ "user": { "id", "username" } }` or `null` |
+| `POST /api/auth/sign-out` | Revokes the current session and clears its cookie |
+| `GET /api/me` | Returns the signed-in user's public fields, or 401 |
 
-Create separate development and production applications/credentials for each provider. Set `BETTER_AUTH_URL` to the backend's externally visible origin and register these exact callback URLs:
-
-| Provider | Development callback | Production callback |
-| --- | --- | --- |
-| Google | `http://localhost:3000/api/auth/callback/google` | `https://YOUR_BACKEND_DOMAIN/api/auth/callback/google` |
-| GitHub | `http://localhost:3000/api/auth/callback/github` | `https://YOUR_BACKEND_DOMAIN/api/auth/callback/github` |
-
-- **Google:** Create a Web application OAuth client in Google Cloud Console, configure its consent screen/audience, and add test users when using testing mode. Register the authorized redirect URI and copy the client ID and secret to the backend environment. The built-in provider requests `openid`, `email`, and `profile`. See [Better Auth's Google setup](https://better-auth.com/docs/authentication/google) and [Google's web-server OAuth guide](https://developers.google.com/identity/protocols/oauth2/web-server).
-- **GitHub:** Create an OAuth App in GitHub Developer Settings with the callback above. The built-in provider requests `read:user` and `user:email`, including private-email lookup; it does not request repository permissions. If using a GitHub App instead, grant Account permissions → Email addresses → Read-only. See [Better Auth's GitHub setup](https://better-auth.com/docs/authentication/github).
-
-Initiate either provider through `POST /api/auth/sign-in/social`:
-
-```json
-{
-  "provider": "google",
-  "callbackURL": "http://localhost:3000/"
-}
-```
-
-Use `"github"` for GitHub. In a browser, navigate to the returned authorization `url`, preserving the cookies from initiation. Better Auth handles the provider callback, exchanges the authorization code, creates the session, and redirects to `callbackURL`. That final application return URL must be trusted; it is separate from the provider callback registered above. No custom token-exchange endpoint is needed.
-
-The local CLI uses this flow without exposing the backend cookie to the browser UI. It requests the provider URL with a relative `callbackURL` of `/api/desktop/handoff?port=<cli-port>&state=<random>`, opens the browser, and waits. After the provider callback creates the backend session, `GET /api/desktop/handoff` mints a single-use Better Auth token (two-minute lifetime) and redirects to `http://127.0.0.1:<port>/api/account/oauth/complete` with the token and the original state. The CLI validates the state (ten-minute lifetime, single use) and exchanges the token for its own session cookie. Tokens and state must never be logged or shared.
-
-### Sessions and account linking
-
-Sessions last seven days and are eligible for rolling refresh after one day of activity. Session cookies are host-only, `HttpOnly`, and `SameSite=Lax`; HTTPS uses `Secure` cookies, while local HTTP development does not. This setup does not provide direct cross-site cookie support.
-
-Matching emails automatically link to one user only when the existing user's email and the incoming provider's email are both verified. An unverified password account must first authenticate using its original method and then explicitly link a verified provider through Better Auth's `/api/auth/link-social` flow. Different-email account linking is disabled. Email verification delivery and password recovery are not configured yet.
-
-Protected routes use `createRequireAuth(auth)` from `apps/server/src/middleware/auth.ts`. It validates the session, populates typed `res.locals.user` and `res.locals.session`, and forwards refreshed or cleared cookies. `GET /api/me` returns `{ "user": ... }` or `401` with `{ "error": "Unauthorized" }`; it does not expose the session token and is not cacheable.
-
-### Email/password smoke test
-
-With the server running and its schema applied, use a cookie jar to carry the session between requests:
-
-```sh
-curl -i -c /tmp/do-better-cookies.txt \
-  -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' \
-  -d '{"name":"Demo User","email":"demo@example.com","password":"a-long-demo-password"}' \
-  http://localhost:3000/api/auth/sign-up/email
-
-curl -i -b /tmp/do-better-cookies.txt -c /tmp/do-better-cookies.txt \
-  -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' \
-  -d '{"email":"demo@example.com","password":"a-long-demo-password"}' \
-  http://localhost:3000/api/auth/sign-in/email
-
-curl -i -b /tmp/do-better-cookies.txt -c /tmp/do-better-cookies.txt \
-  http://localhost:3000/api/auth/get-session
-
-curl -i -b /tmp/do-better-cookies.txt -c /tmp/do-better-cookies.txt \
-  http://localhost:3000/api/me
-
-curl -i -b /tmp/do-better-cookies.txt -c /tmp/do-better-cookies.txt \
-  -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' \
-  -d '{}' http://localhost:3000/api/auth/sign-out
-
-# This now returns 401.
-curl -i -b /tmp/do-better-cookies.txt http://localhost:3000/api/me
-```
+Passwords, password hashes, and session hashes never appear in these responses. Existing CLI session files from Better Auth expire on their next check; sign in again with the newly configured owner.
 
 ### Automated checks
 
@@ -225,9 +162,8 @@ bun run --cwd apps/server test:results
 bun run --cwd apps/server test:saved-runs
 ```
 
-These checks use real localhost HTTP endpoints and SQLite to verify sessions, refresh, logout, project ownership, metrics storage, failed writes, and concurrent upload retries. Closing each in-memory database discards its generated records. Application environment files, a separate database service, and real OAuth credentials are not needed; Google/GitHub callback flows are not covered by these checks.
+These checks use real localhost HTTP endpoints and SQLite to verify sessions, refresh, logout, project ownership, metrics storage, failed writes, and concurrent upload retries. Closing each in-memory database discards its generated records. Application environment files and a separate database service are not needed.
 
-Live OAuth smoke tests remain a separate step: configure real credentials, start the backend, complete each provider's browser flow, verify `/api/me`, then log out and verify `401`.
 
 ## Local test runs and master storage
 
@@ -264,10 +200,11 @@ The CLI requires Node.js 22.18 or newer. It reads optional
 `do-better.config.json` from the directory where the command is run:
 
 ```json
-{ "port": 4310, "apiUrl": "https://do-better-production.up.railway.app" }
+{ "port": 4310, "apiUrl": "http://localhost:47381" }
 ```
 
-With no file or settings, the defaults are `4310` and `https://do-better-production.up.railway.app`.
+With no file or settings, the defaults are `4310` and `http://localhost:47381`.
+Development and production both use this local default; there is no hosted fallback.
 `apiUrl` must be the master server origin without a path, query, or credentials;
 plain HTTP is accepted only for loopback hosts, and other hosts require HTTPS.
 There is no command-line port option. Invalid configuration or an occupied port
@@ -281,14 +218,12 @@ survive locally through the retry queue described below.
 
 ### Signing in and saving runs
 
-Create an account or sign in from the local CLI sign-in screen with email and password.
-The workspace and `POST /api/runs` require a signed-in account. Social sign-in
-buttons are currently hidden. The CLI stores
-the Better Auth session cookie at `~/.do-better/session.json` (owner-only, mode
+Create the installation owner on first use, or sign in with the existing username and password.
+The workspace and `POST /api/runs` require a signed-in owner. The CLI stores
+the session cookie at `~/.do-better/session.json` (owner-only, mode
 `0600`) and never sends it to the browser UI. On startup it validates the saved
 session with `GET /api/auth/get-session`; an invalid session is discarded, while
-an unreachable master shows an offline state with a retry action. OAuth uses the
-desktop handoff described under [OAuth application registration](#oauth-application-registration).
+an unreachable master shows an offline state with a retry action.
 
 When a run finishes while signed in, the CLI uploads it automatically. The
 server assigns the project ID when the CLI calls `POST /api/projects`; the CLI
@@ -322,10 +257,10 @@ Local account, upload, and history endpoints:
 | Endpoint | Behavior |
 | --- | --- |
 | `GET /api/account` | Current account state, user, backend origin, and project ID |
-| `POST /api/account/sign-in` | Email/password sign-in, then retry pending uploads |
+| `GET /api/account/setup` | Check whether this installation needs owner setup |
+| `POST /api/account/setup` | Create the owner with username/password, then retry pending uploads |
+| `POST /api/account/sign-in` | Username/password sign-in, then retry pending uploads |
 | `POST /api/account/sign-out` | Sign out locally and clear the saved session |
-| `POST /api/account/oauth/start` | Build a provider URL and open the browser |
-| `GET /api/account/oauth/complete` | Validate state, exchange the one-time token |
 | `GET /api/uploads` | Count of runs waiting to upload |
 | `POST /api/uploads/retry` | Retry the signed-in user's pending uploads |
 | `GET /api/saved-runs` | Proxy saved runs with `limit`, `offset`, `search`, `outcome`, and `sort` |
@@ -367,7 +302,6 @@ The authenticated master endpoints are:
 | `GET /api/saved-runs` | List the user's saved runs with `limit` (1–100), `offset`, `search`, `outcome` (`all`, `completed`, `stopped`), and `sort` (`newest`, `oldest`) |
 | `GET /api/saved-runs/summary` | Aggregate run counts, request success, endpoint count, and the latest saved run |
 | `GET /api/saved-runs/:id` | Read one saved run in the same shape the local runner returns |
-| `GET /api/desktop/handoff` | Redirect a completed OAuth session to the local CLI with a single-use token |
 
 `GET /api/saved-runs` returns `{ "runs": [...], "total": ..., "limit": ..., "offset": ... }`.
 Each saved run contains its configuration, engine result, project ID, and upload

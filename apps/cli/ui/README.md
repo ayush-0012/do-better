@@ -37,7 +37,7 @@ The Playground executes runs through the local runner and opens each result at
 Filtering, pagination, JSON downloads, theme preferences, configuration validation,
 header editing, and loading run configurations work locally. Drafts and target
 secrets stay in memory. Only the theme is stored in localStorage. The CLI opens account creation and sign-in
-with email/password (social sign-in buttons are currently hidden); the header shows the account state and
+with the owner username/password after first-time setup; the header shows the account state and
 completed runs save to the master automatically. Results show whether a run was
 saved and offer a retry; Settings lists pending uploads.
 
