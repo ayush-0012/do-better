@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { Auth } from "@do-better/auth";
 import type { Database } from "@do-better/db";
 import { testRuns, userProject } from "@do-better/db/schema/application";
-import { and, count, countDistinct, desc, eq, ilike, isNotNull, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -104,11 +104,11 @@ export function createTestRunRoutes(auth: Auth, db: Database) {
       eq(userProject.userId, res.locals.user.id),
       isNotNull(testRuns.result),
     ];
-    if (search) conditions.push(ilike(testRuns.url, `%${escapeLike(search)}%`));
+    if (search) conditions.push(sql`${testRuns.url} like ${`%${escapeLike(search)}%`} escape '\\'`);
     if (outcome === "completed") {
-      conditions.push(sql`${testRuns.result}->>'stopReason' = 'duration_elapsed'`);
+      conditions.push(sql`json_extract(${testRuns.result}, '$.stopReason') = 'duration_elapsed'`);
     } else if (outcome === "stopped") {
-      conditions.push(sql`${testRuns.result}->>'stopReason' <> 'duration_elapsed'`);
+      conditions.push(sql`json_extract(${testRuns.result}, '$.stopReason') <> 'duration_elapsed'`);
     }
     const where = and(...conditions);
 
@@ -141,9 +141,9 @@ export function createTestRunRoutes(auth: Auth, db: Database) {
     const [aggregate] = await db.select({
       totalRuns: count(),
       endpointCount: countDistinct(testRuns.url),
-      completed: sql<string>`count(*) filter (where ${testRuns.result}->>'stopReason' = 'duration_elapsed')`,
-      requestsStarted: sql<string>`coalesce(sum((${testRuns.result}->'metrics'->>'requestsStarted')::bigint), 0)`,
-      requestsSucceeded: sql<string>`coalesce(sum((${testRuns.result}->'metrics'->>'requestsSucceeded')::bigint), 0)`,
+      completed: sql<string>`count(*) filter (where json_extract(${testRuns.result}, '$.stopReason') = 'duration_elapsed')`,
+      requestsStarted: sql<string>`coalesce(sum(cast(json_extract(${testRuns.result}, '$.metrics.requestsStarted') as integer)), 0)`,
+      requestsSucceeded: sql<string>`coalesce(sum(cast(json_extract(${testRuns.result}, '$.metrics.requestsSucceeded') as integer)), 0)`,
     }).from(testRuns)
       .innerJoin(userProject, eq(testRuns.projectId, userProject.id))
       .where(where);

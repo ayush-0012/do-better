@@ -20,8 +20,8 @@ describe("database-backed sessions", () => {
     expect(await response.json()).toMatchObject({ user });
     expect(Object.keys(await (await client.request("/api/me")).json() as object)).toEqual(["user"]);
     expect(client.cookies.has("better-auth.session_token")).toBe(true);
-    const stored = await api.db.$client.query('SELECT id FROM "session" WHERE user_id = $1', [user.id]);
-    expect(stored.rowCount).toBe(1);
+    const stored = api.db.$client.query('SELECT id FROM "session" WHERE user_id = ?').all(user.id);
+    expect(stored.length).toBe(1);
   });
 
   test("rejects incorrect passwords and revokes the session at logout", async () => {
@@ -43,11 +43,11 @@ describe("database-backed sessions", () => {
 
   test("forwards refreshed cookies and rejects expired sessions", async () => {
     const { client, user } = await api.signup();
-    await api.db.$client.query('UPDATE "session" SET expires_at = NOW() + INTERVAL \'5 days\' WHERE user_id = $1', [user.id]);
+    api.db.$client.query('UPDATE "session" SET expires_at = ? WHERE user_id = ?').run(Date.now() + 5 * 24 * 60 * 60 * 1000, user.id);
     const refreshed = await client.request("/api/me");
     expect(refreshed.status).toBe(200);
     expect(refreshed.headers.getSetCookie().some((cookie) => cookie.startsWith("better-auth.session_token="))).toBe(true);
-    await api.db.$client.query('UPDATE "session" SET expires_at = NOW() - INTERVAL \'1 minute\' WHERE user_id = $1', [user.id]);
+    api.db.$client.query('UPDATE "session" SET expires_at = ? WHERE user_id = ?').run(Date.now() - 60 * 1000, user.id);
     expect((await client.request("/api/me")).status).toBe(401);
   });
 });

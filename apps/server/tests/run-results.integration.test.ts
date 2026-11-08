@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { testRuns } from "@do-better/db/schema/application";
+import { eq } from "drizzle-orm";
 
 import {
   RequestPattern,
@@ -84,10 +86,8 @@ describe("master result storage", () => {
     const restored = await owner.client.request(`/api/test-runs/${body.result.id}`);
     expect(restored.status).toBe(200);
     expect(await restored.json()).toEqual({ run });
-    const stored = await api.db.$client.query<{ result: EngineResult }>(
-      'SELECT result FROM "test_runs" WHERE id = $1', [body.result.id],
-    );
-    expect(stored.rows[0]!.result).toEqual(body.result);
+    const stored = await api.db.select({ result: testRuns.result }).from(testRuns).where(eq(testRuns.id, body.result.id));
+    expect(stored[0]!.result).toEqual(body.result);
   });
 
   test("does not persist payloads, target authorization headers, or response bodies", async () => {
@@ -111,10 +111,8 @@ describe("master result storage", () => {
     expect(serialized).not.toContain("target-authorization-not-for-master");
     expect(serialized).not.toContain("payload-not-for-master");
     expect(serialized).not.toContain("response-not-for-master");
-    const stored = await api.db.$client.query<{ result: EngineResult }>(
-      'SELECT result FROM "test_runs" WHERE id = $1', [body.result.id],
-    );
-    expect(stored.rows[0]!.result).toEqual(body.result);
+    const stored = await api.db.select({ result: testRuns.result }).from(testRuns).where(eq(testRuns.id, body.result.id));
+    expect(stored[0]!.result).toEqual(body.result);
   });
 
   test("prevents another user from uploading to a project or reading its runs", async () => {
@@ -137,8 +135,8 @@ describe("master result storage", () => {
       result: { ...body.result, metrics: { ...body.result.metrics, requestsFailed: 99 } },
     })).status).toBe(400);
     expect((await owner.client.request("/api/test-runs/bad-id")).status).toBe(400);
-    const stored = await api.db.$client.query('SELECT id FROM "test_runs" WHERE id = $1', [body.result.id]);
-    expect(stored.rowCount).toBe(0);
+    const stored = api.db.$client.query('SELECT id FROM "test_runs" WHERE id = ?').all(body.result.id);
+    expect(stored.length).toBe(0);
   });
 
   test("handles concurrent upload retries without duplicate records", async () => {
@@ -148,8 +146,8 @@ describe("master result storage", () => {
       owner.client.post("/api/test-runs", body),
     ]);
     expect(responses.map((response) => response.status).sort()).toEqual([200, 201]);
-    const stored = await api.db.$client.query('SELECT id FROM "test_runs" WHERE id = $1', [body.result.id]);
-    expect(stored.rowCount).toBe(1);
+    const stored = api.db.$client.query('SELECT id FROM "test_runs" WHERE id = ?').all(body.result.id);
+    expect(stored.length).toBe(1);
     const conflict = await owner.client.post("/api/test-runs", {
       ...body, result: { ...body.result, elapsedSeconds: 11 },
     });
@@ -158,16 +156,17 @@ describe("master result storage", () => {
 
   test("does not report success on a failed write and allows a later retry", async () => {
     const body = await uploadBody();
-    // This constraint affects only this generated run ID in the isolated test database.
-    await api.db.$client.query(
-      `ALTER TABLE "test_runs" ADD CONSTRAINT test_write_failure CHECK (id <> '${body.result.id}')`,
+    // This trigger affects only this generated run ID in the isolated test database.
+    api.db.$client.exec(
+      `CREATE TRIGGER test_write_failure BEFORE INSERT ON test_runs
+       WHEN NEW.id = '${body.result.id}' BEGIN SELECT RAISE(ABORT, 'test write failure'); END`,
     );
     try {
       expect((await owner.client.post("/api/test-runs", body)).status).toBe(500);
-      const stored = await api.db.$client.query('SELECT id FROM "test_runs" WHERE id = $1', [body.result.id]);
-      expect(stored.rowCount).toBe(0);
+      const stored = api.db.$client.query('SELECT id FROM "test_runs" WHERE id = ?').all(body.result.id);
+      expect(stored.length).toBe(0);
     } finally {
-      await api.db.$client.query('ALTER TABLE "test_runs" DROP CONSTRAINT test_write_failure');
+      api.db.$client.exec("DROP TRIGGER test_write_failure");
     }
     expect((await owner.client.post("/api/test-runs", body)).status).toBe(201);
   });

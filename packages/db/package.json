@@ -7,15 +7,15 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit",
-    "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate:deploy": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
-    "db:migrate": "drizzle-kit migrate",
-    "db:start": "docker compose up -d",
-    "db:watch": "docker compose up",
-    "db:stop": "docker compose stop",
-    "db:down": "docker compose down"
+    "db:push": "bun --bun drizzle-kit push",
+    "db:generate": "bun --bun drizzle-kit generate",
+    "db:migrate:deploy": "bun --bun drizzle-kit migrate",
+    "db:studio": "bun --bun drizzle-kit studio",
+    "db:migrate": "bun --bun drizzle-kit migrate",
+    "db:start": "bun run db:migrate",
+    "db:watch": "bun run db:studio",
+    "db:stop": "bun -e 'console.log(\"SQLite is embedded; no database service to stop. Data files are preserved.\")'",
+    "db:down": "bun -e 'console.log(\"SQLite is embedded; no database service to stop. Data files are preserved.\")'"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

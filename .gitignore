@@ -60,3 +60,9 @@ coverage
 .cache
 tmp
 temp
+
+# SQLite application data
+/apps/server/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

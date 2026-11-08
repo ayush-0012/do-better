@@ -1,15 +1,14 @@
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { createAuth } from "@do-better/auth";
 import { createDb } from "@do-better/db";
 
 import { createApp } from "../../src/app";
 
 export async function startTestApi() {
-  const databaseURL = process.env.TEST_DATABASE_URL;
-  if (!databaseURL) throw new Error("Set TEST_DATABASE_URL to a dedicated test database with the project schema applied.");
-
-  const db = createDb({ DATABASE_URL: databaseURL });
-  await db.$client.query("SELECT 1");
+  const db = createDb({ DATABASE_URL: ":memory:" });
+  migrate(db, { migrationsFolder: fileURLToPath(new URL("../../../../packages/db/src/migrations", import.meta.url)) });
   const server = createServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -25,7 +24,6 @@ export async function startTestApi() {
     GITHUB_CLIENT_SECRET: "test-github-secret",
   }, db);
   server.on("request", createApp({ auth, db, corsOrigin: baseURL }));
-  const userIds: string[] = [];
 
   class Client {
     readonly cookies = new Map<string, string>();
@@ -60,7 +58,6 @@ export async function startTestApi() {
     const response = await client.post("/api/auth/sign-up/email", { name: "Test User", email, password });
     if (response.status !== 200) throw new Error(`Test signup failed: HTTP ${response.status}`);
     const { user } = await response.json() as { user: { id: string; email: string } };
-    userIds.push(user.id);
     return { client, user, password };
   }
 
@@ -69,16 +66,8 @@ export async function startTestApi() {
       if (server.listening) {
         await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
       }
-      if (userIds.length) {
-        const ids = [userIds];
-        await db.$client.query('DELETE FROM "test_runs" WHERE project_id IN (SELECT id FROM "user_project" WHERE user_id = ANY($1::text[]))', ids);
-        await db.$client.query('DELETE FROM "user_project" WHERE user_id = ANY($1::text[])', ids);
-        await db.$client.query('DELETE FROM "session" WHERE user_id = ANY($1::text[])', ids);
-        await db.$client.query('DELETE FROM "account" WHERE user_id = ANY($1::text[])', ids);
-        await db.$client.query('DELETE FROM "user" WHERE id = ANY($1::text[])', ids);
-      }
     } finally {
-      await db.$client.end();
+      db.$client.close();
     }
   }
 
