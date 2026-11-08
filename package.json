@@ -12,7 +12,6 @@
       "typescript": "^6.0.3",
       "@types/bun": "^1.4.2",
       "varlock": "1.18.0",
-      "better-auth": "1.7.5",
       "drizzle-orm": "1.0.0-rc.4"
     }
   },
@@ -36,8 +35,7 @@
     "db:stop": "turbo run db:stop -F @do-better/db --",
     "db:down": "turbo run db:down -F @do-better/db --",
     "env:generate": "varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
-    "postinstall": "varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
-    "auth:generate": "cd apps/server && bun run auth:generate"
+    "postinstall": "varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/"
   },
   "dependencies": {
     "zod": "catalog:"

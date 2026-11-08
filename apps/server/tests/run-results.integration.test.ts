@@ -10,13 +10,13 @@ import {
 import { startTestApi, type TestApi } from "./support/api";
 
 let api: TestApi;
-let owner: Awaited<ReturnType<TestApi["signup"]>>;
-let other: Awaited<ReturnType<TestApi["signup"]>>;
+let owner: Awaited<ReturnType<TestApi["setupOwner"]>>;
+let other: Awaited<ReturnType<TestApi["setupOwner"]>>;
 
 beforeAll(async () => {
   api = await startTestApi();
-  owner = await api.signup();
-  other = await api.signup();
+  owner = await api.setupOwner();
+  other = await api.createUserFixture();
 });
 afterAll(async () => { if (api) await api.close(); });
 

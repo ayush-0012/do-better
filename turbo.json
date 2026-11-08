@@ -48,8 +48,7 @@
     }
   },
   "globalEnv": [
-    "BETTER_AUTH_SECRET",
-    "BETTER_AUTH_URL",
+    "SERVER_ORIGIN",
     "CI",
     "CORS_ORIGIN",
     "DATABASE_URL",
