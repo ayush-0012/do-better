@@ -8,7 +8,7 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **Express** - Fast, unopinionated web framework
 - **Bun** - Runtime environment
 - **Drizzle** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
+- **SQLite** - Embedded database engine
 - **Authentication** - Better-Auth
 - **Turborepo** - Optimized monorepo build system
 
@@ -22,16 +22,22 @@ bun install
 
 ## Database Setup
 
-This project uses PostgreSQL with Drizzle ORM.
+This project uses SQLite through Bun's built-in driver and Drizzle ORM. No database service or Docker container is required.
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
-
-3. Apply the schema to your database:
+1. Set `DATABASE_URL=./data/do-better.sqlite` in `apps/server/.env` (also the schema default).
+2. Apply the committed migrations:
 
 ```bash
-bun run db:push
+bun run --cwd packages/db db:migrate
 ```
+
+Relative database paths resolve from `apps/server` for both the server and database tooling. Absolute paths are supported. The parent directory is created automatically. The default file is `apps/server/data/do-better.sqlite`; database files and WAL sidecars are excluded from Git. PostgreSQL connection URLs are rejected to prevent accidentally opening the wrong file.
+
+The server enables foreign keys, WAL mode, and a five-second busy timeout. Timestamps use integer Unix milliseconds, booleans use integers, results use JSON text, and payment amounts remain decimal strings to avoid floating-point rounding. Payment amounts no longer have PostgreSQL's numeric precision/scale enforcement; callers must supply valid decimal strings. Saved-run search uses SQLite LIKE, which folds ASCII case but does not provide PostgreSQL's locale-aware Unicode case folding.
+
+`db:generate` creates versioned migrations; `db:migrate` applies them. `db:push` directly synchronizes the schema for local development. `db:start` applies migrations, `db:watch` opens Studio, and `db:stop`/`db:down` preserve data without managing a service. Run database scripts through Bun so Drizzle Kit uses its installed Bun driver.
+
+The legacy PostgreSQL Compose file is retained for access to existing data. SQLite migrations create a new schema; they do **not** import PostgreSQL records. Existing PostgreSQL containers and volumes are untouched.
 
 Then, run the development server:
 
@@ -57,7 +63,7 @@ Use the repository's `bun.lock` and Bun version from `packageManager` when insta
 dependencies. The root postinstall script generates the Varlock environment types.
 The build compiles the backend and bundles the shared workspace code.
 
-Set `NODE_ENV=production`, `DATABASE_URL` to your deployed PostgreSQL connection,
+Set `NODE_ENV=production`, `DATABASE_URL` to a SQLite path on persistent local storage (for example `/data/do-better.sqlite`),
 `BETTER_AUTH_SECRET` to a random secret of at least 32 characters, and
 `BETTER_AUTH_URL` to the backend's public HTTPS origin. Set `CORS_ORIGIN` to the
 browser origin allowed to access the backend. For the local CLI UI using its default
@@ -78,7 +84,7 @@ Each app owns its environment schema in `.env.schema`. Varlock generates `src/en
 
 Import the generated `ENV` accessor in application code. Shared database and auth packages receive configuration or initialized clients from the application. See [Varlock's monorepo guide](https://varlock.dev/guides/monorepos/).
 
-Bun's automatic env loading is disabled in `bunfig.toml`; the framework integration or server bootstrap loads Varlock. Node deployments must include Varlock and its dependencies alongside the app schema.
+Bun's automatic env loading is disabled in `bunfig.toml`; the framework integration or server bootstrap loads Varlock. The backend requires Bun for `bun:sqlite`; deployments must include Varlock and its dependencies alongside the app schema. SQLite deployments require a persistent disk and a single application instance; an ephemeral deployment filesystem will lose saved data when replaced.
 
 Run standalone Node/Bun tools that use Varlock from the owning app directory so they load that app's schema and env files. `env:generate` only generates TypeScript files; it does not initialize environment values in a subsequent command.
 
@@ -103,7 +109,7 @@ do-better/
 - `bun run dev:server`: Start only the server
 - `bun run check-types`: Check TypeScript types across all apps
 - `bun run db:push`: Push schema changes to database
-- `bun run db:generate`: Generate database client/types
+- `bun run db:generate`: Generate versioned SQL migrations
 - `bun run db:migrate`: Run database migrations
 - `bun run db:studio`: Open database studio UI
 
@@ -113,7 +119,7 @@ After changing auth plugins or schema options, run `bun run auth:generate` from 
 
 ## Authentication
 
-The backend supports email/password, Google, and GitHub through Better Auth. All three use PostgreSQL-backed sessions. The existing `user`, `account`, `session`, and `verification` tables support these methods without a schema change.
+The backend supports email/password, Google, and GitHub through Better Auth. All three use SQLite-backed sessions. The existing `user`, `account`, `session`, and `verification` tables support these methods without a schema change.
 
 ### Server configuration
 
@@ -121,7 +127,7 @@ Set these values in the server's ignored `apps/server/.env` file or deployment e
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | SQLite file path, relative to `apps/server` or absolute |
 | `BETTER_AUTH_SECRET` | A random secret of at least 32 characters; generate one with `openssl rand -base64 32` |
 | `BETTER_AUTH_URL` | Public backend origin, such as `http://localhost:3000` for development |
 | `CORS_ORIGIN` | The explicitly allowed frontend origin; use `http://localhost:3000` for the backend-only examples below |
@@ -211,18 +217,15 @@ Engine checks run without a database or network access:
 bun run --cwd apps/cli test:engine
 ```
 
-Session and result-upload checks use a dedicated database inside the existing `do-better` PostgreSQL container. From the repository root:
+Session and result-upload checks each use an isolated in-memory SQLite database with the committed migrations applied. From the repository root:
 
-```sh
-docker exec do-better createdb -U postgres do_better_test
-export TEST_DATABASE_URL='postgresql://postgres:password@localhost:5432/do_better_test'
-DATABASE_URL="$TEST_DATABASE_URL" bun run --cwd packages/db db:push
+```bash
 bun run --cwd apps/server test:auth
 bun run --cwd apps/server test:results
-docker exec do-better dropdb -U postgres do_better_test
+bun run --cwd apps/server test:saved-runs
 ```
 
-Use `TEST_DATABASE_URL` only for a dedicated test database, not the `do-better` application database. The integration checks use real HTTP endpoints and PostgreSQL to verify sessions, refresh, logout, project ownership, metrics storage, failed writes, and concurrent upload retries. They clean up their generated records. Real OAuth credentials and application environment files are not needed; Google/GitHub callback flows are not covered by these checks.
+These checks use real localhost HTTP endpoints and SQLite to verify sessions, refresh, logout, project ownership, metrics storage, failed writes, and concurrent upload retries. Closing each in-memory database discards its generated records. Application environment files, a separate database service, and real OAuth credentials are not needed; Google/GitHub callback flows are not covered by these checks.
 
 Live OAuth smoke tests remain a separate step: configure real credentials, start the backend, complete each provider's browser flow, verify `/api/me`, then log out and verify `401`.
 
