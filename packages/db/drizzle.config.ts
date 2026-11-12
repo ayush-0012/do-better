@@ -1,17 +1,18 @@
 import { defineConfig } from "drizzle-kit";
-import "varlock/auto-load";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { loadConfig } from "../../apps/cli/src/config";
 import { resolveDatabasePath } from "./src/config";
 
-const databasePath = resolveDatabasePath(process.env.DATABASE_URL || "./data/do-better.sqlite", resolve(import.meta.dirname, "../../apps/server"));
+const settings = loadConfig(resolve(import.meta.dirname, "../../apps/cli"));
+const databasePath = process.env.DATABASE_URL
+  ? resolveDatabasePath(process.env.DATABASE_URL, process.cwd())
+  : settings.databasePath;
 mkdirSync(dirname(databasePath), { recursive: true });
 
 export default defineConfig({
   schema: "./src/schema/index.ts",
   out: "./src/migrations",
   dialect: "sqlite",
-  dbCredentials: {
-    url: databasePath,
-  },
+  dbCredentials: { url: databasePath },
 });

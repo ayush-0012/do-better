@@ -7,7 +7,7 @@ import {
 } from "./constants.ts";
 import { AccountError, type AccountService } from "./account.ts";
 import { readJsonFile, resolveStateDirectory, writeJsonFile } from "./local-state.ts";
-import { ProjectStore } from "./projects.ts";
+import type { RunStore } from "./run-store.ts";
 import type { LocalRun, RunConfiguration } from "./runner.ts";
 
 const PENDING_FILENAME = "pending-uploads.json";
@@ -34,6 +34,7 @@ export interface RetrySummary {
 
 export interface UploadServiceOptions {
   account: AccountService;
+  store: RunStore;
   stateDirectory?: string;
 }
 
@@ -47,16 +48,16 @@ interface PendingUpload {
 export class UploadService {
   private readonly account: AccountService;
   private readonly pendingPath: string;
-  private readonly projects: ProjectStore;
+  private readonly store: RunStore;
   private readonly uploadStates = new Map<string, RunUploadState>();
   private pending: PendingUpload[] | null = null;
   private loadError: string | undefined;
   private pendingQueue: Promise<unknown> = Promise.resolve();
 
-  constructor({ account, stateDirectory }: UploadServiceOptions) {
+  constructor({ account, store, stateDirectory }: UploadServiceOptions) {
     this.account = account;
     this.pendingPath = join(resolveStateDirectory(stateDirectory), PENDING_FILENAME);
-    this.projects = new ProjectStore(stateDirectory);
+    this.store = store;
   }
 
   async initialize() {
@@ -69,7 +70,7 @@ export class UploadService {
   }
 
   async getProjectId(userId: string) {
-    return this.projects.getForUser(userId);
+    return this.store.getProjectId(userId);
   }
 
   getUploadState(runId: string): RunUploadState {
@@ -87,7 +88,7 @@ export class UploadService {
     });
   }
 
-  /** Uploads once and keeps the run for a later retry if anything fails. */
+  /** Saves once and keeps the run for a later retry if anything fails. */
   async uploadCompletedRun(run: LocalRun): Promise<RunUploadState> {
     const account = this.account.getStatus();
     if (account.state !== "signed_in") {
@@ -105,7 +106,7 @@ export class UploadService {
     } catch (error) {
       let projectId: string | null = null;
       try {
-        projectId = await this.projects.getForUser(account.user.id);
+        projectId = await this.store.getProjectId(account.user.id);
       } catch {
         projectId = null;
       }
@@ -128,7 +129,7 @@ export class UploadService {
     }
   }
 
-  /** Retries only the current user's pending uploads; runs are never rerun. */
+  /** Retries only the current user's pending local saves; runs are never rerun. */
   retryPending(): Promise<RetrySummary> {
     return this.withPendingLock(() => this.retryPendingLocked());
   }
@@ -144,7 +145,7 @@ export class UploadService {
       return {
         uploaded: 0,
         remaining: this.pending?.length ?? 0,
-        error: "Sign in to the master server before retrying saved runs.",
+        error: "Sign in before retrying saved runs.",
       };
     }
 
@@ -165,7 +166,7 @@ export class UploadService {
         let projectId = record.projectId;
         if (!projectId) {
           try {
-            projectId = await this.projects.getForUser(account.user.id);
+            projectId = await this.store.getProjectId(account.user.id);
           } catch {
             projectId = null;
           }
@@ -206,36 +207,19 @@ export class UploadService {
   }
 
   private async ensureProject(userId: string) {
-    const existing = await this.projects.getForUser(userId);
+    const existing = await this.store.getProjectId(userId);
     return existing ?? this.createProject(userId);
   }
 
   private async createProject(userId: string) {
-    const response = await this.account.fetchWithSession("/api/projects", {
-      method: "POST",
-      body: {},
-    });
-    const projectId = readProjectId(await response.json());
-    try {
-      await this.projects.setForUser(userId, projectId);
-    } catch {
-      // The upload can proceed with the project returned for this session.
-    }
-    return projectId;
+    const owner = await this.account.requireUser();
+    if (owner.id !== userId) throw new AccountError("The active user has changed. Sign in again.", 401);
+    return this.store.createProject(userId);
   }
 
   private async postRun(projectId: string, params: UploadParams, result: EngineResult) {
-    try {
-      await this.account.fetchWithSession("/api/test-runs", {
-        method: "POST",
-        body: { projectId, params, result },
-      });
-    } catch (error) {
-      if (error instanceof AccountError && error.status === 401) {
-        await this.account.invalidate();
-      }
-      throw error;
-    }
+    const owner = await this.account.requireUser();
+    await this.store.save(owner.id, { projectId, params, result });
   }
 
   private enqueue(record: PendingUpload) {
@@ -253,7 +237,7 @@ export class UploadService {
     } else {
       if (pending.length >= MAX_PENDING_UPLOADS) {
         throw new Error(
-          `There are already ${MAX_PENDING_UPLOADS} runs waiting to upload. Sign in and retry before running more.`,
+          `There are already ${MAX_PENDING_UPLOADS} runs waiting to save. Sign in and retry before running more.`,
         );
       }
       pending.push(record);
@@ -327,21 +311,6 @@ function toUploadParams(configuration: RunConfiguration): UploadParams {
     },
     concurrencyLimit: configuration.concurrency,
   };
-}
-
-function readProjectId(payload: unknown) {
-  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error("The master server returned an invalid project.");
-  }
-  const project = (payload as { project?: unknown }).project;
-  if (project === null || typeof project !== "object" || Array.isArray(project)) {
-    throw new Error("The master server returned an invalid project.");
-  }
-  const id = (project as { id?: unknown }).id;
-  if (typeof id !== "string" || !id) {
-    throw new Error("The master server returned an invalid project.");
-  }
-  return id;
 }
 
 function errorMessage(error: unknown) {

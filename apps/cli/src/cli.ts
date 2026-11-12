@@ -20,15 +20,15 @@ export async function runCli(
   if (args.length !== 1 || args[0] !== "start") {
     throw new Error("Usage: do-better start (set the port in do-better.config.json)");
   }
-  const { port, apiUrl } = await loadConfig(directory);
-  const server = await startLocalServer(port, { uiDirectory, apiUrl }).catch((error: NodeJS.ErrnoException) => {
+  const { port, databasePath } = await loadConfig(directory);
+  const server = await startLocalServer(port, { uiDirectory, databasePath }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "EADDRINUSE") {
       throw new Error(`Port ${port} is already in use. Stop the other process or change port in do-better.config.json.`);
     }
     throw error;
   });
   const url = `http://127.0.0.1:${port}`;
-  console.log(`do-better is running at ${url}\nPress Ctrl+C to stop.`);
+  console.log(`do-better is running at ${url}\nSQLite: ${databasePath}\nPress Ctrl+C to stop.`);
 
   const shutdown = () => {
     server.close();

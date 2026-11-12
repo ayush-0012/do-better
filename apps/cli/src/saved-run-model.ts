@@ -1,5 +1,5 @@
-import type { EngineResult } from "../../cli/src/constants";
-import { engineResultSchema } from "../../cli/src/constants";
+import type { EngineResult } from "./constants.ts";
+import { engineResultSchema } from "./constants.ts";
 
 const REQUEST_PATTERNS = new Set(["constant", "ramp", "burst", "randomized"]);
 

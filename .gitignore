@@ -62,7 +62,7 @@ tmp
 temp
 
 # SQLite application data
-/apps/server/data/
+/apps/cli/data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

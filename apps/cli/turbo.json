@@ -3,7 +3,11 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["$TURBO_EXTENDS$", "@do-better/ui#build"]
+      "dependsOn": ["$TURBO_EXTENDS$", "@do-better/ui#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/auth/src/**", "$TURBO_ROOT$/packages/db/src/**"]
+    },
+    "check-types": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/auth/src/**", "$TURBO_ROOT$/packages/db/src/**"]
     }
   }
 }

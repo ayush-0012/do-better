@@ -8,7 +8,9 @@ import {
 import { join, resolve } from "node:path";
 import { AccountService } from "./account.ts";
 import { handleLocalApi } from "./api.ts";
-import { DEFAULT_API_URL } from "./config.ts";
+import { DEFAULT_DATABASE_PATH } from "./config.ts";
+import { openDatabase } from "./database.ts";
+import { RunStore } from "./run-store.ts";
 import {
   contentTypeFor,
   DEFAULT_UI_DIRECTORY,
@@ -36,12 +38,10 @@ const CONTENT_SECURITY_POLICY = [
 export interface LocalServerOptions {
   /** Overrides the UI build directory; tests use a fixture. */
   uiDirectory?: string;
-  /** Master API origin used for sign-in and run uploads. */
-  apiUrl?: string;
+  /** Persistent SQLite file opened by the CLI. */
+  databasePath?: string;
   /** Overrides ~/.do-better for tests or custom installs. */
   stateDirectory?: string;
-  /** Tests can skip waiting for the saved session check. */
-  awaitSessionCheck?: boolean;
 }
 
 export async function startLocalServer(
@@ -51,17 +51,16 @@ export async function startLocalServer(
   const uiDirectory = resolve(options.uiDirectory ?? DEFAULT_UI_DIRECTORY);
   await assertUiBuild(uiDirectory);
 
-  const account = new AccountService({
-    backendUrl: options.apiUrl ?? DEFAULT_API_URL,
-    stateDirectory: options.stateDirectory,
-  });
-  const uploads = new UploadService({
-    account,
-    stateDirectory: options.stateDirectory,
-  });
+  const db = openDatabase(options.databasePath ?? DEFAULT_DATABASE_PATH);
+  const account = new AccountService(db, options.stateDirectory);
+  const store = new RunStore(db);
+  const uploads = new UploadService({ account, store, stateDirectory: options.stateDirectory });
+  try {
+    await Promise.all([account.initialize(), uploads.initialize()]);
+  } catch (error) { db.$client.close(); throw error; }
 
   const server = createServer((req, res) => {
-    serveRequest(req, res, server, uiDirectory, account, uploads).catch(
+    serveRequest(req, res, server, uiDirectory, account, uploads, store).catch(
       (error: unknown) => {
         console.error(
           `do-better: local UI request failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -74,22 +73,15 @@ export async function startLocalServer(
       },
     );
   });
-  await new Promise<void>((resolveListen, reject) => {
-    server.once("error", reject);
-    server.listen(port, HOST, () => {
-      server.off("error", reject);
-      resolveListen();
+  server.once("close", () => db.$client.close());
+  try {
+    await new Promise<void>((resolveListen, reject) => {
+      server.once("error", reject);
+      server.listen(port, HOST, () => { server.off("error", reject); resolveListen(); });
     });
-  });
-
-  if (options.awaitSessionCheck !== false) {
-    await Promise.all([account.initialize(), uploads.initialize()]);
-    if (account.getStatus().state === "signed_in") void uploads.retryPending();
-  } else {
-    void Promise.all([account.initialize(), uploads.initialize()]).then(() => {
-      if (account.getStatus().state === "signed_in")
-        void uploads.retryPending();
-    });
+  } catch (error) { db.$client.close(); throw error; }
+  if (account.getStatus().state === "signed_in") {
+    void uploads.retryPending().catch(error => console.error(`do-better: pending saves could not be retried: ${error instanceof Error ? error.message : "Unknown error"}`));
   }
   return server;
 }
@@ -113,6 +105,7 @@ async function serveRequest(
   uiDirectory: string,
   account: AccountService,
   uploads: UploadService,
+  store: RunStore,
 ) {
   // Keep the local service inaccessible through attacker-controlled DNS names.
   const address = server.address();
@@ -137,6 +130,7 @@ async function serveRequest(
     await handleLocalApi(req, res, url, `http://${expectedHost}`, {
       account,
       uploads,
+      store,
     })
   )
     return;

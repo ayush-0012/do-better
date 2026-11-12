@@ -1,354 +1,96 @@
 import { join } from "node:path";
-import {
-  readJsonFile,
-  removeJsonFile,
-  resolveStateDirectory,
-  writeJsonFile,
-} from "./local-state.ts";
+import { createAuth, AuthError, type AuthUser } from "../../../packages/auth/src/index.ts";
+import type { Database } from "./database.ts";
+import { AccountError } from "./errors.ts";
+import { readJsonFile, removeJsonFile, resolveStateDirectory, writeJsonFile } from "./local-state.ts";
 
-const SESSION_FILENAME = "session.json";
-const REQUEST_TIMEOUT_MS = 5_000;
-
-export interface AccountUser {
-  id: string;
-  username: string;
-}
-
+export { AccountError } from "./errors.ts";
+export type AccountUser = AuthUser;
 export type AccountStatus =
-  | { state: "checking"; backendUrl: string }
-  | { state: "signed_out"; backendUrl: string }
-  | { state: "signed_in"; backendUrl: string; user: AccountUser }
-  | { state: "unavailable"; backendUrl: string; error: string };
-
-export class AccountError extends Error {
-  constructor(
-    message: string,
-    readonly status = 0,
-  ) {
-    super(message);
-    this.name = "AccountError";
-  }
-}
-
-interface JsonRequestInit extends Omit<RequestInit, "body"> {
-  body?: unknown;
-}
-
-export interface AccountServiceOptions {
-  backendUrl: string;
-  stateDirectory?: string;
-  fetch?: typeof fetch;
-  timeoutMs?: number;
-}
-
-interface StoredSession {
-  cookies: Record<string, string>;
-  savedAt?: string;
-}
+  | { state: "checking" }
+  | { state: "signed_out" }
+  | { state: "signed_in"; user: AccountUser }
+  | { state: "unavailable"; error: string };
 
 export class AccountService {
-  private readonly backendUrl: string;
+  private readonly auth: ReturnType<typeof createAuth>;
   private readonly sessionPath: string;
-  private readonly fetchImpl: typeof fetch;
-  private readonly timeoutMs: number;
-  private readonly cookies = new Map<string, string>();
-  private status: AccountStatus;
-  private initialization: Promise<void> | null = null;
+  private cookies: Record<string, string> = {};
+  private status: AccountStatus = { state: "checking" };
+  private attempts = 0;
+  private windowEnd = 0;
 
-  constructor(options: AccountServiceOptions) {
-    this.backendUrl = options.backendUrl;
-    this.sessionPath = join(
-      resolveStateDirectory(options.stateDirectory),
-      SESSION_FILENAME,
-    );
-    this.fetchImpl = options.fetch ?? fetch;
-    this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
-    this.status = { state: "checking", backendUrl: this.backendUrl };
+  constructor(database: Database, stateDirectory?: string) {
+    this.auth = createAuth({ secureCookies: false }, database);
+    this.sessionPath = join(resolveStateDirectory(stateDirectory), "session.json");
   }
 
-  initialize() {
-    this.initialization ??= this.loadSavedSession();
-    return this.initialization;
-  }
-
-  getStatus(): AccountStatus {
-    return this.status;
-  }
-
-  get backendOrigin() {
-    return this.backendUrl;
-  }
-
-  async getSetupStatus(): Promise<{ setupRequired: boolean }> {
-    const response = await this.request("/api/auth/setup");
-    const payload = await readResponse<{ setupRequired?: unknown }>(response);
-    if (typeof payload?.setupRequired !== "boolean") throw new AccountError("The master server returned an invalid setup status.", 502);
-    return { setupRequired: payload.setupRequired };
-  }
-
-  async signIn(username: string, password: string) {
-    return this.authenticate("sign-in", { username, password });
-  }
-
-  async setup(username: string, password: string) {
-    return this.authenticate("setup", { username, password });
-  }
-
-  private async authenticate(action: "sign-in" | "setup", credentials: { username: string; password: string }) {
-    const response = await this.request(`/api/auth/${action}`, { method: "POST", body: credentials });
-    const payload = await readResponse<{ user?: unknown }>(response);
-    const startedSession = this.captureCookies(response.headers);
-    const user = toAccountUser(payload?.user);
-    if (!user || !startedSession) {
-      throw new AccountError("The master server did not start a session.", 502);
-    }
-    this.status = { state: "signed_in", backendUrl: this.backendUrl, user };
-    await this.persistSession();
-    return this.getStatus();
-  }
-
-  async signOut(): Promise<{ warning?: string }> {
-    let warning: string | undefined;
-    if (this.cookies.size > 0) {
-      try {
-        const response = await this.request("/api/auth/sign-out", {
-          method: "POST",
-          body: {},
-        });
-        this.captureCookies(response.headers);
-      } catch (error) {
-        warning =
-          error instanceof Error
-            ? `Signed out locally, but the master server could not be reached: ${error.message}`
-            : "Signed out locally, but the master server could not be reached.";
+  async initialize() {
+    const stored = await readJsonFile(this.sessionPath);
+    if (stored !== null) {
+      if (typeof stored !== "object" || Array.isArray(stored) || !("cookies" in stored)
+        || !stored.cookies || typeof stored.cookies !== "object" || Array.isArray(stored.cookies)
+        || !Object.values(stored.cookies).every(value => typeof value === "string")) {
+        throw new Error(`Invalid saved session at ${this.sessionPath}.`);
       }
-    }
-    this.cookies.clear();
-    await removeJsonFile(this.sessionPath);
-    this.status = { state: "signed_out", backendUrl: this.backendUrl };
-    return warning ? { warning } : {};
-  }
-
-  /**
-   * Sends an authenticated request to the master. Callers must check the
-   * account state first; a missing session is treated as an authentication
-   * failure rather than silently sending an anonymous request.
-   */
-  async fetchWithSession(path: string, init: JsonRequestInit = {}) {
-    if (this.cookies.size === 0) {
-      throw new AccountError("Sign in to the master server first.", 401);
-    }
-    const response = await this.request(path, init);
-    if (this.captureCookies(response.headers)) await this.persistSession();
-    return response;
-  }
-
-  async invalidate() {
-    this.cookies.clear();
-    this.status = { state: "signed_out", backendUrl: this.backendUrl };
-    await removeJsonFile(this.sessionPath);
-  }
-
-  private async loadSavedSession() {
-    let stored: unknown;
-    try {
-      stored = await readJsonFile(this.sessionPath);
-    } catch (error) {
-      this.status = {
-        state: "unavailable",
-        backendUrl: this.backendUrl,
-        error:
-          error instanceof Error
-            ? `The saved session could not be read: ${error.message}`
-            : "The saved session could not be read.",
-      };
-      return;
-    }
-
-    if (stored === null) {
-      this.status = { state: "signed_out", backendUrl: this.backendUrl };
-      return;
-    }
-    if (!isStoredSession(stored)) {
-      this.status = {
-        state: "unavailable",
-        backendUrl: this.backendUrl,
-        error: "The saved session file is invalid. Sign in again to replace it.",
-      };
-      return;
-    }
-
-    for (const [name, value] of Object.entries(stored.cookies)) {
-      this.cookies.set(name, value);
-    }
-    if (this.cookies.size === 0) {
-      await removeJsonFile(this.sessionPath);
-      this.status = { state: "signed_out", backendUrl: this.backendUrl };
-      return;
+      this.cookies = stored.cookies as Record<string, string>;
     }
     await this.refreshSession();
   }
 
-  private async refreshSession() {
-    if (this.cookies.size === 0) {
-      this.status = { state: "signed_out", backendUrl: this.backendUrl };
-      return this.status;
-    }
+  getStatus() { return this.status; }
+  async getSetupStatus() { return { setupRequired: await this.auth.setupRequired() }; }
+  async setup(username: string, password: string) { return this.authenticate("setup", username, password); }
+  async signIn(username: string, password: string) { return this.authenticate("signIn", username, password); }
 
-    let response: Response;
+  private async authenticate(action: "setup" | "signIn", username: string, password: string) {
+    if (Date.now() >= this.windowEnd) { this.attempts = 0; this.windowEnd = Date.now() + 60_000; }
+    if (++this.attempts > 10) throw new AccountError("Too many login attempts. Try again in a minute.", 429);
     try {
-      response = await this.request("/api/auth/get-session", { method: "GET" });
+      const result = await this.auth[action]({ username, password });
+      this.captureCookie(result.cookie);
+      await this.persist();
+      this.status = { state: "signed_in", user: result.user };
+      return this.status;
     } catch (error) {
-      if (error instanceof AccountError && (error.status === 401 || error.status === 403)) {
-        await this.invalidate();
-        return this.status;
-      }
-      this.status = {
-        state: "unavailable",
-        backendUrl: this.backendUrl,
-        error:
-          error instanceof Error
-            ? error.message
-            : "The master server could not be reached.",
-      };
-      return this.status;
+      if (error instanceof AuthError) throw new AccountError(error.message, error.status);
+      throw error;
     }
+  }
 
-    let payload: { user?: unknown };
-    try {
-      payload = await readResponse<{ user?: unknown }>(response);
-    } catch (error) {
-      this.status = {
-        state: "unavailable",
-        backendUrl: this.backendUrl,
-        error:
-          error instanceof Error
-            ? error.message
-            : "The master server returned an invalid response.",
-      };
-      return this.status;
-    }
-    this.captureCookies(response.headers);
-    const user = toAccountUser(payload?.user);
-    if (!user) {
-      await this.invalidate();
-      return this.status;
-    }
-
-    this.status = { state: "signed_in", backendUrl: this.backendUrl, user };
-    await this.persistSession();
+  async refreshSession() {
+    const value = await this.auth.getSession(this.headers());
+    if (!value) { await this.invalidate(); return this.status; }
+    if (value.cookie) { this.captureCookie(value.cookie); await this.persist(); }
+    this.status = { state: "signed_in", user: value.user };
     return this.status;
   }
 
-  private async request(path: string, init: JsonRequestInit = {}) {
-    const { body: requestBody, ...rest } = init;
-    const headers = new Headers(rest.headers);
-    headers.set("Origin", this.backendUrl);
-    if (requestBody !== undefined) headers.set("Content-Type", "application/json");
-    if (this.cookies.size > 0) headers.set("Cookie", this.cookieHeader());
-    const body = requestBody === undefined ? undefined : JSON.stringify(requestBody);
-
-    let response: Response;
-    try {
-      response = await this.fetchImpl(new URL(path, this.backendUrl), {
-        ...rest,
-        body,
-        headers,
-        signal: rest.signal ?? AbortSignal.timeout(this.timeoutMs),
-        redirect: "manual",
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error && error.name === "TimeoutError"
-          ? "The master server did not respond in time."
-          : "Could not reach the account service. Please try again.";
-      throw new AccountError(message);
-    }
-
-    if (!response.ok) {
-      // Error bodies may be null, HTML, or empty (for example, an older master
-      // returns 404/null for owner setup). Keep the original HTTP status.
-      const payload: unknown = await response.json().catch(() => null);
-      const details = payload !== null && typeof payload === "object" && !Array.isArray(payload)
-        ? payload as { message?: unknown; error?: unknown }
-        : undefined;
-      const message =
-        path === "/api/auth/setup" && response.status === 404
-          ? `The master server at ${this.backendUrl} does not support owner setup. Set apiUrl to the updated master server.`
-          : typeof details?.message === "string"
-            ? details.message
-            : typeof details?.error === "string"
-              ? details.error
-            : `The master server returned HTTP ${response.status}.`;
-      throw new AccountError(message, response.status);
-    }
-    return response;
+  async requireUser() {
+    await this.refreshSession();
+    if (this.status.state !== "signed_in") throw new AccountError("Sign in to access your workspace.", 401);
+    return this.status.user;
   }
 
-  private captureCookies(headers: Headers) {
-    let changed = false;
-    for (const cookie of headers.getSetCookie()) {
-      const pair = cookie.split(";")[0];
-      if (!pair) continue;
-      const equals = pair.indexOf("=");
-      if (equals <= 0) continue;
-      const name = pair.slice(0, equals).trim();
-      const value = pair.slice(equals + 1).trim();
-      const expired = /max-age=0(?:;|$)/i.test(cookie) || !value;
-      if (expired) {
-        if (this.cookies.delete(name)) changed = true;
-      } else {
-        this.cookies.set(name, value);
-        changed = true;
-      }
-    }
-    return changed;
+  async signOut() {
+    await this.auth.signOut(this.headers());
+    await this.invalidate();
+    return {};
   }
 
-  private cookieHeader() {
-    return [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+  async invalidate() {
+    this.cookies = {};
+    this.status = { state: "signed_out" };
+    await removeJsonFile(this.sessionPath);
   }
 
-  private async persistSession() {
-    if (this.cookies.size === 0) {
-      await removeJsonFile(this.sessionPath);
-      return;
-    }
-    const stored: StoredSession = {
-      cookies: Object.fromEntries(this.cookies),
-      savedAt: new Date().toISOString(),
-    };
-    await writeJsonFile(this.sessionPath, stored);
+  private headers() {
+    return new Headers({ cookie: Object.entries(this.cookies).map(([name, value]) => `${name}=${value}`).join("; ") });
   }
-
-
-}
-
-function isStoredSession(value: unknown): value is StoredSession {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const cookies = (value as { cookies?: unknown }).cookies;
-  return (
-    cookies !== null &&
-    typeof cookies === "object" &&
-    !Array.isArray(cookies) &&
-    Object.values(cookies).every((cookie) => typeof cookie === "string")
-  );
-}
-
-function toAccountUser(value: unknown): AccountUser | null {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-  const user = value as { id?: unknown; username?: unknown };
-  if (typeof user.id !== "string" || !user.id || typeof user.username !== "string" || !user.username) return null;
-  return {
-    id: user.id,
-    username: user.username,
-  };
-}
-
-async function readResponse<T>(response: Response): Promise<T> {
-  try {
-    return (await response.json()) as T;
-  } catch {
-    throw new AccountError("The master server returned an invalid response.", response.status);
+  private captureCookie(cookie: string) {
+    const pair = cookie.split(";")[0]!;
+    const index = pair.indexOf("=");
+    this.cookies[pair.slice(0, index)] = pair.slice(index + 1);
   }
+  private async persist() { await writeJsonFile(this.sessionPath, { cookies: this.cookies, savedAt: new Date().toISOString() }); }
 }

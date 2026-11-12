@@ -17,15 +17,12 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev --filter=@do-better/web --filter=server",
+    "dev": "turbo run dev --filter=@do-better/web",
     "build": "turbo run build",
     "build:cli": "turbo run build -F do-better-cli",
-    "build:server": "bun run --cwd apps/server build",
     "build:web": "bun run --cwd apps/web build",
-    "start:server": "bun run --cwd apps/server start",
-    "start": "bun run start:server",
+    "start": "bun run --cwd apps/cli start",
     "check-types": "turbo run check-types",
-    "dev:server": "turbo run dev -F server --",
     "db:push": "turbo run db:push -F @do-better/db --",
     "db:studio": "turbo run db:studio -F @do-better/db --",
     "db:generate": "turbo run db:generate -F @do-better/db --",
@@ -34,8 +31,7 @@
     "db:watch": "turbo run db:watch -F @do-better/db --",
     "db:stop": "turbo run db:stop -F @do-better/db --",
     "db:down": "turbo run db:down -F @do-better/db --",
-    "env:generate": "varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
-    "postinstall": "varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/"
+    "dev:cli": "bun run build:cli && bun run --cwd apps/cli start"
   },
   "dependencies": {
     "zod": "catalog:"

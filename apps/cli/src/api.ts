@@ -3,6 +3,7 @@ import { AccountError, type AccountService } from "./account.ts";
 import { engineParamsSchema } from "./constants.ts";
 import { getLocalRun, getRunnerStatus, RunnerBusyError, startLocalRun } from "./runner.ts";
 import { fetchSavedRun, fetchSavedRuns, fetchSavedRunsSummary } from "./saved-runs.ts";
+import type { RunStore } from "./run-store.ts";
 import type { UploadService } from "./uploads.ts";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -22,6 +23,7 @@ class ApiError extends Error {
 export interface LocalApiServices {
   account: AccountService;
   uploads: UploadService;
+  store: RunStore;
 }
 
 /**
@@ -60,8 +62,11 @@ async function route(
   res: ServerResponse,
   url: URL,
   expectedOrigin: string,
-  { account, uploads }: LocalApiServices,
+  { account, uploads, store }: LocalApiServices,
 ) {
+  if (req.method === "POST") requireOrigin(req, expectedOrigin);
+  const publicPaths = ["/api/account", "/api/account/setup", "/api/account/sign-in", "/api/account/sign-out"];
+  if (!publicPaths.includes(url.pathname)) await account.requireUser();
   if (url.pathname === "/api/runner") {
     requireMethod(req, "GET");
     sendJson(res, 200, getRunnerStatus());
@@ -155,20 +160,20 @@ async function route(
 
   if (url.pathname === "/api/saved-runs") {
     requireMethod(req, "GET");
-    sendJson(res, 200, await fetchSavedRuns(account, url.searchParams));
+    sendJson(res, 200, await fetchSavedRuns(account, store, url.searchParams));
     return;
   }
 
   if (url.pathname === "/api/saved-runs/summary") {
     requireMethod(req, "GET");
-    sendJson(res, 200, await fetchSavedRunsSummary(account));
+    sendJson(res, 200, await fetchSavedRunsSummary(account, store));
     return;
   }
 
   const savedRunId = savedRunIdFromPath(url.pathname);
   if (savedRunId !== null) {
     requireMethod(req, "GET");
-    sendJson(res, 200, await fetchSavedRun(account, savedRunId));
+    sendJson(res, 200, await fetchSavedRun(account, store, savedRunId));
     return;
   }
 
@@ -191,9 +196,9 @@ async function route(
 }
 
 async function accountSnapshot(account: AccountService, uploads: UploadService) {
-  const status = account.getStatus();
+  const status = await account.refreshSession();
   if (status.state !== "signed_in") return { ...status, projectId: null };
-  const projectId = await uploads.getProjectId(status.user.id).catch(() => null);
+  const projectId = await uploads.getProjectId(status.user.id);
   return { ...status, projectId };
 }
 
