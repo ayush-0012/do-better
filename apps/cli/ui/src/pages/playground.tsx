@@ -4,7 +4,8 @@ import { ArrowRight, FlaskConical, LockKeyhole, RotateCcw, ScanLine } from "luci
 import { PageHeading } from "@/components/ui/page-heading";
 import { FieldError } from "@/components/ui/field-error";
 import { Button } from "@/components/ui/button";
-import { CodeEditor } from "@/features/playground/code-editor";
+import { BodyEditor } from "@/features/playground/body-editor";
+import { QueryEditor } from "@/features/playground/field-editor";
 import { HeaderEditor } from "@/features/playground/header-editor";
 import { LoadProfile } from "@/features/playground/load-profile";
 import { useRequestDraft, type RequestDraft } from "@/features/playground/draft-provider";
@@ -32,7 +33,8 @@ export function PlaygroundPage() {
   const runnerStatus = useRunnerStatus();
   const startRun = useStartRun();
   const formRef = useRef<HTMLFormElement>(null);
-  const [tab, setTab] = useState<"body" | "headers">("body");
+  const [tab, setTab] = useState<"body" | "headers" | "query">("body");
+  const [isPreparing, setIsPreparing] = useState(false);
   const [errors, setErrors] = useState<DraftErrors>({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [focusField, setFocusField] = useState<DraftField | null>(null);
@@ -42,7 +44,7 @@ export function PlaygroundPage() {
   const errorCount = Object.keys(errors).length;
 
   const activeStatus = runnerStatus.data?.state === "running" ? runnerStatus.data : null;
-  const isRunning = startRun.isPending || activeStatus !== null;
+  const isRunning = isPreparing || startRun.isPending || activeStatus !== null;
   const startedAt = activeStatus?.startedAt ?? runStartedAt;
   const elapsedSeconds = startedAt ? Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000)) : 0;
   const runningTarget = activeStatus?.target ?? draft.url;
@@ -70,7 +72,7 @@ export function PlaygroundPage() {
     if (hasSubmitted) setErrors(getDraftErrors({ ...draft, ...changes }));
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (isRunning) return;
 
@@ -85,12 +87,15 @@ export function PlaygroundPage() {
       return;
     }
 
-    let params: ReturnType<typeof draftToEngineParams>;
+    let params: Awaited<ReturnType<typeof draftToEngineParams>>;
+    setIsPreparing(true);
     try {
-      params = draftToEngineParams(draft);
-    } catch {
-      setRunError("The request body must be valid JSON.");
+      params = await draftToEngineParams(draft);
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : "The request body could not be prepared.");
       return;
+    } finally {
+      setIsPreparing(false);
     }
 
     setRunError("");
@@ -137,13 +142,12 @@ export function PlaygroundPage() {
               </div>
             </div>
             <div className="editor-tabs" role="group" aria-label="Request editor section">
+              <button type="button" aria-pressed={tab === "query"} onClick={() => setTab("query")}>Params <span className="count-label">{draft.queryParams.filter(field => field.name || field.value).length}</span></button>
               <button type="button" aria-pressed={tab === "body"} onClick={() => setTab("body")}>Request body{errors.body && <span className="tab-error" aria-label="has an error">!</span>}</button>
               <button type="button" aria-pressed={tab === "headers"} onClick={() => setTab("headers")}>Headers <span className="count-label">{draft.headers.length}</span>{errors.headers && <span className="tab-error" aria-label="has an error">!</span>}</button>
-              <span className="editor-format">{tab === "body" ? "JSON" : "Key / Value"}</span>
             </div>
-            {tab === "body" ? <>
-              <CodeEditor id="request-body" value={draft.body} onChange={(body) => changeDraft({ body })}
-                invalid={Boolean(errors.body)} describedBy={errors.body ? "body-error" : undefined} />
+            {tab === "query" ? <QueryEditor url={draft.url} entries={draft.queryParams} onChange={(url, queryParams) => changeDraft({ url, queryParams })} /> : tab === "body" ? <>
+              <BodyEditor draft={draft} onChange={changeDraft} error={errors.body} />
               <div className="editor-validation"><FieldError id="body-error" message={errors.body} /></div>
             </> : <>
               <HeaderEditor headers={draft.headers} error={errors.headers} onChange={(headers) => changeDraft({ headers })} />
@@ -166,7 +170,7 @@ export function PlaygroundPage() {
           </div>
           <div className="execution-actions">
             <Button variant="ghost" type="button" onClick={reset} disabled={isRunning}><RotateCcw />Reset</Button>
-            <Button size="lg" type="submit" disabled={isRunning}>{isRunning ? "Running…" : <>Run test<ArrowRight /></>}</Button>
+            <Button size="lg" type="submit" disabled={isRunning}>{isPreparing ? "Preparing…" : isRunning ? "Running…" : <>Run test<ArrowRight /></>}</Button>
           </div>
         </div>
         <p className="help-text run-footnote">Drafts stay in memory while you navigate. Reloading clears headers and request bodies.</p>

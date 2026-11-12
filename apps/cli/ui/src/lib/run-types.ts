@@ -1,6 +1,7 @@
 import type { EngineParams, EngineResult } from "../../../src/constants";
 
 export type { EngineParams } from "../../../src/constants";
+export { MAX_REQUEST_FILE_BYTES, MAX_RUN_PAYLOAD_BYTES } from "../../../src/request-limits";
 
 export type RequestPattern = `${EngineParams["requestPattern"]}`;
 export type RateUnit = `${EngineParams["requestRateUnit"]}`;

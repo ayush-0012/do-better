@@ -2,6 +2,8 @@
 
 Do Better is a browser-based tool for load testing HTTP APIs from your own machine. Build a POST request in the Playground, choose a traffic profile, and inspect HTTP status counts, throughput, and response times. Sign in to run tests and save results to your account.
 
+The Params editor stays synchronized with the URL and supports repeated parameter names. Body types include None, JSON, Text, XML, URL-encoded form, Multipart form (text fields and files), and Binary file. The runner sets Content-Type automatically unless you provide a custom header; multipart always generates its own boundary, so remove any custom Content-Type for that mode. Selected files must total at most 512 KiB, and the complete run configuration must fit the local API's 1 MiB limit. Files remain in memory and are reused for each request rather than streamed from disk during the test. Query parameters are part of the saved target URL; request headers, body fields and file contents are excluded from saved reports.
+
 ## Install and start
 
 You need **Bun 1.3.14 or newer** on PATH. You can install the npm package using npm; the CLI runtime itself is Bun. The package includes the UI, application code and SQLite migrations. No separate master server is required.
@@ -46,7 +48,7 @@ createServer((req, res) => {
 ```
 
 1. Open **Playground** and set the URL to `http://127.0.0.1:4400/api/echo`.
-2. Set the `Content-Type` header to `application/json` and enter `{"message":"hello"}` as the request body.
+2. Select JSON as the body type and enter `{"message":"hello"}`. Content-Type is set automatically.
 3. Select **Constant**, set the rate to **5 requests per second**, duration to **10 seconds**, and concurrency to **2**.
 4. Choose **Run test**. In the results, look for HTTP `200` responses in **HTTP status distribution**.
 
