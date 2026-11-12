@@ -1,4 +1,5 @@
 import type { EngineParams, EngineResult, RequestRateFunction } from "../constants.ts";
+import { prepareRequestData } from "../request-body.ts";
 import {
   ENGINE_TICK_MS,
   REQUEST_PATTERN_DEFAULTS,
@@ -7,7 +8,7 @@ import {
 } from "../constants.ts";
 
 // preparing the params for passing in the api calls
-export function prepareEngineParams(input: EngineParams) {
+export async function prepareEngineParams(input: EngineParams) {
   const params = engineParamsSchema.parse(input);
 
   return {
@@ -18,16 +19,7 @@ export function prepareEngineParams(input: EngineParams) {
         ? params.requestRate / 60
         : params.requestRate,
     requestRateUnit: RequestRateUnit.PerSecond,
-    requestData:
-      params.requestData === undefined
-        ? undefined
-        : {
-            headers: params.requestData.headers,
-            body:
-              params.requestData.body === undefined
-                ? undefined
-                : JSON.stringify(params.requestData.body),
-          },
+    requestData: await prepareRequestData(params.requestData),
   };
 }
 
@@ -79,15 +71,11 @@ export function createRandomizedRequestRate(
 }
 
 export async function makeApiCalls(
-  params: ReturnType<typeof prepareEngineParams>,
+  params: Awaited<ReturnType<typeof prepareEngineParams>>,
   getRequestRate: RequestRateFunction,
 ): Promise<EngineResult> {
   const headers = new Headers(params.requestData?.headers);
   const body = params.requestData?.body;
-
-  if (body !== undefined && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
 
   const controller = new AbortController();
   const activeRequests = new Set<Promise<void>>();

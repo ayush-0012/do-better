@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { MAX_REQUEST_FILE_BYTES } from "./request-limits";
+export { MAX_REQUEST_FILE_BYTES, MAX_RUN_PAYLOAD_BYTES } from "./request-limits";
 
 // it will be converted into seconds later on (incoming time types)
 export enum RequestRateUnit {
@@ -25,6 +27,22 @@ export const ENGINE_TICK_MS = 10; // 10ms for engine req scheduling time
 
 export type RequestRateFunction = (elapsedSeconds: number) => number;
 
+const fileSchema = z.object({
+  name: z.string().max(255),
+  mediaType: z.string().max(255).regex(/^[^\r\n\0]*$/),
+  base64: z.string().max(Math.ceil(MAX_REQUEST_FILE_BYTES / 3) * 4)
+    .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+});
+const fieldsSchema = z.array(z.object({ name: z.string(), value: z.string() }));
+const encodedBodySchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), text: z.string(), mediaType: z.enum(["text/plain", "application/xml"]) }),
+  z.object({ type: z.literal("urlencoded"), fields: fieldsSchema }),
+  z.object({ type: z.literal("multipart"), fields: z.array(z.object({
+    name: z.string(), value: z.string(), file: fileSchema.optional(),
+  })) }),
+  z.object({ type: z.literal("binary"), file: fileSchema }),
+]);
+
 export const engineParamsSchema = z.object({
   url: z.string().refine((value) => {
     try {
@@ -42,6 +60,20 @@ export const engineParamsSchema = z.object({
     .object({
       headers: z.record(z.string(), z.string()).optional(),
       body: z.json().optional(),
+      encodedBody: encodedBodySchema.optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.body !== undefined && data.encodedBody !== undefined) {
+        ctx.addIssue({ code: "custom", message: "Choose only one request body format." });
+      }
+      const encoded = data.encodedBody;
+      const files = encoded?.type === "binary" ? [encoded.file]
+        : encoded?.type === "multipart" ? encoded.fields.flatMap(field => field.file ? [field.file] : []) : [];
+      const bytes = files.reduce((sum, file) => sum + file.base64.length / 4 * 3 - (file.base64.endsWith("==") ? 2 : file.base64.endsWith("=") ? 1 : 0), 0);
+      if (bytes > MAX_REQUEST_FILE_BYTES) ctx.addIssue({ code: "custom", message: "Selected files must total at most 512 KiB." });
+      if (encoded?.type === "multipart" && Object.keys(data.headers ?? {}).some(name => name.toLowerCase() === "content-type")) {
+        ctx.addIssue({ code: "custom", message: "Remove the Content-Type header for multipart; the runner generates its boundary." });
+      }
     })
     .optional(),
   requestPattern: z.enum(RequestPattern),

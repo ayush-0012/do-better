@@ -9,7 +9,7 @@ import {
 } from "./utils/helper.ts";
 
 export async function runEngine(params: EngineParams): Promise<EngineResult> {
-  const preparedParams = prepareEngineParams(params);
+  const preparedParams = await prepareEngineParams(params);
 
   // running the engine based on the request pattern (handling different type of req patterns)
   switch (preparedParams.requestPattern) {

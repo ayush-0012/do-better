@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { AccountError, type AccountService } from "./account.ts";
-import { engineParamsSchema } from "./constants.ts";
+import { engineParamsSchema, MAX_RUN_PAYLOAD_BYTES } from "./constants.ts";
 import { getLocalRun, getRunnerStatus, RunnerBusyError, startLocalRun } from "./runner.ts";
 import { fetchSavedRun, fetchSavedRuns, fetchSavedRunsSummary } from "./saved-runs.ts";
 import type { RunStore } from "./run-store.ts";
 import type { UploadService } from "./uploads.ts";
 
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = MAX_RUN_PAYLOAD_BYTES;
 
 class ApiError extends Error {
   constructor(
