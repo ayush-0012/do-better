@@ -4,7 +4,7 @@ Do Better is a browser-based tool for load testing HTTP APIs from your own machi
 
 ## Install and start
 
-You need Node.js **22.18 or newer** and npm. The package includes the browser UI.
+You need **Bun 1.3.14 or newer** on PATH. You can install the npm package using npm; the CLI runtime itself is Bun. The package includes the UI, application code and SQLite migrations. No separate master server is required.
 
 ```sh
 npm install -g do-better-cli
@@ -15,8 +15,7 @@ The CLI opens the UI at `http://127.0.0.1:4310`. If your browser doesn’t open,
 
 ## Sign in
 
-The CLI opens a sign-in screen in your browser. Use your email and password or
-select **Create an account**. After signing in, you can open the Playground,
+On first use, the CLI asks you to choose the owner username and password. Later visits offer username/password sign-in. After signing in, you can open the Playground,
 Overview, History, and Settings.
 
 To change the local UI port, create `do-better.config.json` in the directory
@@ -59,7 +58,7 @@ Use **Ramp**, **Burst**, or **Random** to vary traffic over time. The concurrenc
 - **Throughput** shows completed requests per second. Latency shows the minimum, average, and maximum time through reading the response body.
 - **History** shows saved runs and lets you reopen a report or load its configuration into the Playground. If a save fails, retry from the report or **Settings → Account**. Retrying a save doesn’t send another load test.
 
-Target requests run from your machine. Saved reports can include the target URL, run settings, and aggregate metrics. Request headers and payloads are excluded from uploads, and response bodies are discarded after timing.
+Target requests run from your machine. Saved reports can include the target URL, run settings, and aggregate metrics. Request headers and payloads are excluded from saved results, and response bodies are discarded after timing.
 
 ## Troubleshooting
 
@@ -67,8 +66,12 @@ Target requests run from your machine. Saved reports can include the target URL,
 | --- | --- |
 | `do-better: command not found` | Check that the global npm install succeeded and npm’s global executable directory is on your `PATH`. Run `npm prefix -g` to find the install prefix. |
 | Port `4310` is already in use | Stop the process using it or set another port in `do-better.config.json`. |
-| Sign-in fails or the account server is unavailable | Check your internet connection and try signing in again. |
+| Sign-in or saving fails | Check the CLI terminal, database path and file permissions. |
 | Every request fails | Check the HTTP status distribution, then confirm that the target is reachable from your machine and that it accepts POST with the headers and body you entered. |
+
+## Local database
+
+By default, saved data lives in `~/.do-better/do-better.sqlite`. Set `databasePath` in `do-better.config.json` to use another file; relative paths resolve from that config file’s directory. Startup applies packaged migrations automatically. The retired `apiUrl` setting is no longer accepted.
 
 ## Build from source
 

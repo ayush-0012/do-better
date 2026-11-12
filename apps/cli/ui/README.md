@@ -37,13 +37,13 @@ Filtering, pagination, JSON downloads, theme preferences, configuration validati
 header editing, and loading run configurations work locally. Drafts and target
 secrets stay in memory. Only the theme is stored in localStorage. The CLI opens account creation and sign-in
 with the owner username/password after first-time setup; the header shows the account state and
-completed runs save to the master automatically. Results show whether a run was
+completed runs save to local SQLite automatically. Results show whether a run was
 saved and offer a retry; Settings lists pending uploads.
 
-Overview and History load the signed-in account's saved runs through the CLI.
-History filtering, sorting, and pagination run on the master API, and exporting
+Overview and History read the signed-in account's saved runs through the CLI.
+History filtering, sorting, and pagination run against SQLite inside the CLI, and exporting
 downloads the current page. All workspace pages require sign-in. Signed-out visitors are returned to the sign-in screen.
-Run results use CLI memory first and then fetch saved runs from the master. The
+Run results use CLI memory first and then read saved runs from SQLite. The
 `sample-runs` fixture is no longer rendered.
 
 The exports are design references, not an API specification. Unsupported generated
@@ -52,6 +52,4 @@ and zero telemetry) are intentionally omitted.
 
 The UI sends API-call configuration to the CLI's local HTTP runner, which invokes
 the existing engine and returns results. Target requests execute locally. The CLI
-holds the master session and uploads completed runs; the browser never receives
-the session cookie. Authentication and database storage belong to the master
-server.
+validates the owner session and saves completed runs directly to SQLite. The browser never receives the saved session token. No separate master server is required.
