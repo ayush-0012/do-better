@@ -22,7 +22,6 @@ export interface AccountUser {
 
 export interface AccountSnapshot {
   state: "checking" | "signed_out" | "signed_in" | "unavailable";
-  backendUrl: string;
   user?: AccountUser;
   error?: string;
   projectId: string | null;

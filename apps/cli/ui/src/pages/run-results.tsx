@@ -75,7 +75,7 @@ export function RunResultsPage({ runId }: { runId: string }) {
     </div><aside className="report-sidebar"><div className="notice"><h3>Configuration preserved</h3><p>Load this profile in the playground to prepare another run. Headers and payloads are not included in saved metadata.</p></div>
       <section className="panel report-section"><div className="section-title"><h2>Load profile</h2><span className="quiet-tag">{patternLabels[configuration.pattern]}</span></div><PatternPreview pattern={configuration.pattern} />
         <dl className="detail-list"><div><dt>Planned rate</dt><dd>{configuration.rate} req/{configuration.rateUnit === "per_second" ? "sec" : "min"}</dd></div><div><dt>Concurrency</dt><dd>{configuration.concurrency}</dd></div><div><dt>Planned duration</dt><dd>{configuration.durationSeconds} seconds</dd></div><div><dt>Stop policy</dt><dd>HTTP 500 / network error</dd></div></dl></section>
-      <section className="panel report-section privacy-panel"><LockKeyhole size={22} /><h3>Payload stays local</h3><p>Response bodies are discarded. Target headers and request bodies are never part of your account upload.</p></section>
+      <section className="panel report-section privacy-panel"><LockKeyhole size={22} /><h3>Payload stays local</h3><p>Response bodies are discarded. Target headers and request bodies are never stored with saved results.</p></section>
     </aside></div>
     <div className="execution-tray"><div className="execution-message"><SlidersHorizontal className="accent-icon" /><p>Try another rate or concurrency limit.</p></div><Button variant="outline" onClick={loadInPlayground}>Open in editor<ArrowRight /></Button></div>
   </div>;

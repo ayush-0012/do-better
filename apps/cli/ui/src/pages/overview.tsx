@@ -29,7 +29,7 @@ export function OverviewPage() {
 
   if (summaryQuery.isError) {
     return <div className="page-container"><EmptyState title="Saved runs are unavailable"
-      description={summaryQuery.error instanceof Error ? summaryQuery.error.message : "The master server could not be reached."}
+      description={summaryQuery.error instanceof Error ? summaryQuery.error.message : "The local database could not be read."}
       action={<Button onClick={() => void summaryQuery.refetch()}>Try again</Button>} /></div>;
   }
 

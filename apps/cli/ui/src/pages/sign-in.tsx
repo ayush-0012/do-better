@@ -37,7 +37,7 @@ export function SignInPage() {
     <h1 id="sign-in-title">{isSetup ? "Set up your workspace" : "Sign in to do-better"}</h1>
     <p>{isSetup ? "Choose the owner's username and password. This installation supports one owner." : "Sign in to run tests on this machine and access your saved reports."}</p>
     {checking ? <p role="status">Checking your workspace…</p> : unavailable ? <>
-      <p className="field-error" role="alert">{account.data?.error ?? "Could not reach the master server. Check the connection and try again."}</p>
+      <p className="field-error" role="alert">{account.data?.error ?? "Could not open the local workspace. Check the CLI terminal and try again."}</p>
       <Button variant="outline" onClick={() => { void account.refetch(); void setupStatus.refetch(); }}>Try again</Button>
     </> : <form className="account-form" onSubmit={submit}>
       <label className="field">Username<input autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={(event) => setUsername(event.target.value)} maxLength={64} pattern="[a-zA-Z0-9_.\-]+" required disabled={pending} aria-describedby={isSetup ? "username-help" : undefined} /></label>

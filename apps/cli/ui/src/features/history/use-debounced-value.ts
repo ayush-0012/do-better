@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-/** Keeps history searches from sending a master request on every keystroke. */
+/** Keeps history searches from querying saved history on every keystroke. */
 export function useDebouncedValue<T>(value: T, delayMs = 250) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {

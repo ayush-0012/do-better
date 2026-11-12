@@ -73,7 +73,7 @@ export function App() {
         <WorkbenchPreview />
       </section>
       <section className="section quickstart-grid" id="get-started">
-        <div><p className="eyebrow">CLI quickstart</p><h2>Install. Launch.<br />Run your first test.</h2><p className="section-description">Install <code>do-better-cli</code> with npm. You need Node.js 22.18 or newer, a browser, and an API you control.</p><a className="text-link" href="https://www.npmjs.com/package/do-better-cli">View the npm package<ArrowRight size={16} /></a></div>
+        <div><p className="eyebrow">CLI quickstart</p><h2>Install. Launch.<br />Run your first test.</h2><p className="section-description">Install <code>do-better-cli</code> with npm. You need Bun 1.3.14 or newer, a browser, and an API you control.</p><a className="text-link" href="https://www.npmjs.com/package/do-better-cli">View the npm package<ArrowRight size={16} /></a></div>
         <ol className="setup-steps">
           <li><h3><span>01</span>Install globally</h3><CopyCommand command="npm install -g do-better-cli" /></li>
           <li><h3><span>02</span>Start the local workspace</h3><CopyCommand command="do-better start" /><p>The CLI opens your browser at <code>http://127.0.0.1:4310</code>. Keep the terminal running while you test.</p></li>

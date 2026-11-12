@@ -53,8 +53,8 @@ export function SettingsPage() {
         </dl>}
 
         {isSignedIn && <div className="account-pending">
-          <div><h3>Saved runs</h3><p>{pendingUploads.isPending ? "Checking saved runs…" : pendingError ? pendingError : pendingCount === 0 ? "No runs waiting to upload." : `${pendingCount} run${pendingCount === 1 ? "" : "s"} waiting to upload.`}</p></div>
-          <Button size="sm" variant="outline" onClick={() => retryPending.mutate()} disabled={retryPending.isPending || pendingCount === 0 || Boolean(pendingError)}>{retryPending.isPending ? "Retrying…" : "Retry uploads"}</Button>
+          <div><h3>Saved runs</h3><p>{pendingUploads.isPending ? "Checking saved runs…" : pendingError ? pendingError : pendingCount === 0 ? "No runs waiting to save." : `${pendingCount} run${pendingCount === 1 ? "" : "s"} waiting to save.`}</p></div>
+          <Button size="sm" variant="outline" onClick={() => retryPending.mutate()} disabled={retryPending.isPending || pendingCount === 0 || Boolean(pendingError)}>{retryPending.isPending ? "Retrying…" : "Retry saves"}</Button>
         </div>}
         {(retryNotice || retryError) && <p className="help-text account-note" role="status">{retryError || retryNotice}</p>}
 
@@ -64,7 +64,7 @@ export function SettingsPage() {
         </div>}
 
       </section>
-      <section id="privacy" className="panel settings-section"><h2><LockKeyhole size={21} />Data & privacy</h2><ul className="privacy-list"><li><strong>Requests execute locally.</strong> Target calls belong to the engine on your computer.</li><li><strong>Payloads stay local.</strong> Request headers and bodies are excluded from master uploads.</li><li><strong>Runs save automatically.</strong> When you are signed in, completed run metrics upload to your account.</li><li><strong>Failed saves wait locally.</strong> Unsaved runs remain in <code>~/.do-better</code> for retry and are never rerun. They contain the target URL and aggregate metrics, not headers or request bodies.</li><li><strong>Response bodies are discarded.</strong> They are consumed for timing and never stored as result content.</li><li><strong>Drafts remain in memory.</strong> Reloading this page clears request payloads and headers. Your session is stored locally and checked with the account service on startup.</li></ul></section>
+      <section id="privacy" className="panel settings-section"><h2><LockKeyhole size={21} />Data & privacy</h2><ul className="privacy-list"><li><strong>Requests execute locally.</strong> Target calls belong to the engine on your computer.</li><li><strong>Payloads stay local.</strong> Request headers and bodies are excluded from saved results.</li><li><strong>Runs save automatically.</strong> When you are signed in, completed run metrics save to your local database.</li><li><strong>Failed saves wait locally.</strong> Unsaved runs remain in <code>~/.do-better</code> for retry and are never rerun. They contain the target URL and aggregate metrics, not headers or request bodies.</li><li><strong>Response bodies are discarded.</strong> They are consumed for timing and never stored as result content.</li><li><strong>Drafts remain in memory.</strong> Reloading this page clears request payloads and headers. Your session is stored locally and checked against the local database on startup.</li></ul></section>
     </div></div>
   </div>;
 }
